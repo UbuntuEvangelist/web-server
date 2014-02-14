@@ -774,41 +774,41 @@ else
   checkingIvs = {}
   checkForDuplicateMessage = (resendId, username, room, message, callback) ->
     if (resendId?)
-      logger.info "checking if #{message.iv} is already being checked"
-      logger.info "checkingIvs: #{JSON.stringify(checkingIvs)}"
+      #logger.debug "checking if #{message.iv} is already being checked"
+      #logger.debug "checkingIvs: #{JSON.stringify(checkingIvs)}"
       checkingMessageId = checkingIvs[message.iv]
-      logger.info "checkingMessageId: #{checkingMessageId}"
+      #logger.debug "checkingMessageId: #{checkingMessageId}"
       if checkingMessageId?
         message.id = checkingMessageId
         sMessage = JSON.stringify(message)
-        logger.info "#{message.iv} is already being checked, sending message back #{sMessage}"
+        #logger.debug "#{message.iv} is already being checked, sending message back #{sMessage}"
         callback null, sMessage
       else
         #set id of message we're checking so we can return same id to client and keep things in sync
         checkingIvs[message.iv] = message.id
         if (resendId > 0)
-          logger.info "searching room: #{room} from id: #{resendId} for duplicate messages"
+          logger.debug "searching room: #{room} from id: #{resendId} for duplicate messages"
           #check messages client doesn't have for dupes
           cdb.getMessagesAfterId username, room, parseInt(resendId, 10), false, (err, data) ->
-            logger.info "error getting messages #{err}" if err?
+            #logger.debug "error getting messages #{err}" if err?
             return callback err if err?
             found = _.find data, (checkMessage) ->
-              logger.info "comparing ivs #{checkMessage.iv},#{message.iv}"
+              #logger.debug "comparing ivs #{checkMessage.iv},#{message.iv}"
               checkMessage.iv == message.iv
             delete checkingIvs[message.iv]
-            logger.info "checkingIvs: #{JSON.stringify(checkingIvs)}"
+            #logger.debug "checkingIvs: #{JSON.stringify(checkingIvs)}"
             callback null, JSON.stringify found
         else
-          logger.info "searching up to 30 messages from room: #{room} for duplicates"
+          logger.debug "searching up to 30 messages from room: #{room} for duplicates"
           #check last 30 for dupes
           cdb.getMessages username, room, 30, false, (err, data) ->
             logger.error "error getting messages #{err}" if err?
             return callback err if err?
             found = _.find data, (checkMessage) ->
-              logger.info "comparing ivs #{checkMessage.iv},#{message.iv}"
+              #logger.debug "comparing ivs #{checkMessage.iv},#{message.iv}"
               checkMessage.iv == message.iv
             delete checkingIvs[message.iv]
-            logger.info "checkingIvs: #{JSON.stringify(checkingIvs)}"
+            #logger.debug "checkingIvs: #{JSON.stringify(checkingIvs)}"
             callback null, JSON.stringify found
     else
       callback null, null
@@ -880,7 +880,7 @@ else
     #INCR message id
     getNextMessageId room, id, (id) ->
       return callback new MessageError(iv, 500) unless id?
-      logger.info "createAndSendMessage, spot: #{room}, id: #{id}, iv: #{iv}, resendId: #{resendId}"
+      logger.debug "createAndSendMessage, spot: #{room}, id: #{id}, iv: #{iv}, resendId: #{resendId}"
       message.id = id
 
       #check for dupes after generating id to preserve ordering
@@ -888,7 +888,7 @@ else
       checkForDuplicateMessage resendId, from, room, message, (err, found) ->
         return callback new MessageError(iv, 500) if err?
         if found?
-          logger.info "found duplicate message, not adding to db"
+          logger.debug "found duplicate message, not adding to db"
           #if it's already in db it's already been sent to other user, no need to send again
           #sio.sockets.to(to).emit "message", found
           sio.sockets.to(from).emit "message", found
@@ -941,7 +941,7 @@ else
                   #TODO per user threshold based on pay status
                   #delete the oldest message(s)
                   deleteCount = card - MESSAGES_PER_USER
-                  logger.info "deleteCount #{from}: #{deleteCount}"
+                  logger.debug "deleteCount #{from}: #{deleteCount}"
                   if deleteCount > 0
 
                     rc.zrange userMessagesKey,  0, deleteCount-1, (err, messagePointers) ->
