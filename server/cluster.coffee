@@ -986,7 +986,7 @@ else
                   message.deleteControlMessages = theirDeleteControlMessages
                 theirMessage = JSON.stringify message
 
-                logger.info "#{from}->#{to}, mimeType: #{mimeType} id: #{message.id}"
+                logger.info "#{message.id}: #{from}->#{to}, mimeType: #{mimeType}"
 
                 sio.sockets.to(to).emit "message", theirMessage
                 sio.sockets.to(from).emit "message", myMessage
