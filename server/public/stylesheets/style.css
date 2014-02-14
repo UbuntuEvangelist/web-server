@@ -11,7 +11,8 @@ div.logo {
     top: 0;
     left: 0;
     position: absolute;
-    opacity:0.5;
+    opacity:0.2;
+    width: 100%;
 }
 
 div.text {
@@ -25,7 +26,8 @@ div.text {
 }
 
 img.logo {
-    width: 100%;
+    display: block; margin: 0 auto;
+    max-width: 100%;
 }
 
 a:link {
