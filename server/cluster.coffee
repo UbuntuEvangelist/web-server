@@ -954,7 +954,6 @@ else
                         messagePointers,
                         (item, callback) ->
                           messageData = getMessagePointerData from, item
-
                           #if the message we deleted is not part of the same conversation,send a control message
                           deletedFromSameSpot = room is messageData.spot
                           deleteMessage from, messageData.spot, messageData.id, not deletedFromSameSpot, (err, deleteControlMessage) ->
@@ -1185,7 +1184,7 @@ else
       return socket.emit new MessageError(data, 500)
 
     if typeIsArray message
-      logger.info "received array of messages from #{user}, length #{message.length}" if message.length > 0
+      logger.debug "received array of messages from #{user}, length #{message.length}" if message.length > 0
       async.each(
         message,
         (item, callback) ->
@@ -1195,7 +1194,7 @@ else
         (err) -> )
 
     else
-      logger.info "received single message: #{data}"
+      logger.debug "received single message: #{data}"
       handleSingleMessage user, message, (err) ->
         socket.emit "messageError", err if err?
 
@@ -1322,7 +1321,7 @@ else
 
 
   deleteMessage = (deletingUser, spot, messageId, sendControlMessage, callback) ->
-    logger.info "user #{deletingUser} deleting message from: #{spot} id: #{messageId}"
+    logger.debug "user #{deletingUser} deleting message from: #{spot} id: #{messageId}"
     otherUser = common.getOtherSpotUser spot, deletingUser
 
     #call callback immediately
@@ -1340,13 +1339,13 @@ else
     #delete it from redis
     rc.zrem "m:#{deletingUser}", "m:#{spot}:#{messageId}", (err, result) ->
       logger.error "error deleting message from redis: #{err}" if err?
-      logger.info "deleted message pointer for: #{spot} id: #{messageId}"
+      logger.debug "deleted message pointer for: #{spot} id: #{messageId}"
 
     #get the message we're deleting
     #todo eliminate this get by storing from, data and mimetype in redis if not text
     cdb.getMessage deletingUser, spot, messageId, (err, message) ->
       logger.error "error gettingMessage: #{err}" if err?
-      logger.info "got message from cassandra for: #{spot} id: #{messageId}"
+      logger.debug "got message from cassandra for: #{spot} id: #{messageId}"
       #if it's not in cassandra then don't do anything else
       return if not message?
 
@@ -2030,7 +2029,9 @@ else
                 multi.sadd "u", username
                 multi.exec (err,replies) ->
                   return next err if err?
-                  logger.info "#{username} created, uid: #{user.id}"
+                  os = uaparser.parseOS req.headers['user-agent']
+                  family = os.family
+                  logger.info "#{username} created, uid: #{user.id}, family: #{family}"
                   req.login user, ->
                     req.user = user
 
