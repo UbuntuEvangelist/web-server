@@ -599,7 +599,7 @@ else
     #check token with google
     googleapis.discover("androidpublisher", "v1.1").execute (err, client) ->
       if err?
-        logger.error "error validating voice messaging, #{err}"
+        logger.error "error validating voice messaging, #{JSON.stringify(err)}"
         oauth2Client = null
         return
 
@@ -613,7 +613,7 @@ else
       checkClient ->
         getPurchaseInfo client, oauth2Client, token, (err, data) ->
           if err?
-            logger.error "error validating voice messaging, #{err}"
+            logger.error "error validating voice messaging, #{JSON.stringify(err)}"
             oauth2Client = null
             return
           return unless data?.purchaseState?
@@ -1235,10 +1235,8 @@ else
 
             cipherdata = message.data
             resendId = message.resendId
-            mimeType = message.mimeType
-            #todo validate mimetype
 
-            createAndSendMessage from, fromVersion, to, toVersion, iv, cipherdata, mimeType, null, null, Date.now(), resendId, callback
+            createAndSendMessage from, fromVersion, to, toVersion, iv, cipherdata, "text/plain", null, null, Date.now(), resendId, callback
 
 
   sio.on "connection", (socket) ->
