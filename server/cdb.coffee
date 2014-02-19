@@ -523,8 +523,9 @@ exports.deleteAll = (username, callback) ->
          delete from messageControlmessages where username = ?
          delete from usercontrolmessages where username = ?
          delete from publickeys where username = ?
+         delete from frienddata where username = ?
          apply batch"
-  pool.cql cql, [username, username, username, username], callback
+  pool.cql cql, [username, username, username, username, username], callback
 
 
 
@@ -590,6 +591,147 @@ exports.deletePublicKeys = (username, callback) ->
   logger.debug "deletePublicKeys #{username}"
   cql = "delete from publickeys where username=?;"
   pool.cql cql, [username], callback
+
+
+#friend data
+exports.insertFriendImageData = (username, friendname, url, version, iv, callback) ->
+  if username? and friendname? and url? and version? and iv?
+    cql =
+      "INSERT INTO frienddata (username, friendname, imageUrl, imageVersion, imageIv)
+                   VALUES (?,?,?,?,?);"
+
+    #logger.debug "sending cql #{cql}"
+
+    pool.cql cql, [
+      username,
+      friendname,
+      url,
+      version,
+      iv
+    ], (err, results) ->
+      if err?
+        logger.error "error inserting friend image data for username: #{username}, friendname: #{friendname}"
+      callback(err,results)
+  else
+    callback()
+
+exports.insertFriendAliasData = (username, friendname, data, version, iv, callback) ->
+
+  if username? and friendname? and data? and version? and iv?
+    cql =
+      "INSERT INTO frienddata (username, friendname, aliasData, aliasVersion, aliasIv)
+                   VALUES (?,?,?,?,?);"
+
+    #logger.debug "sending cql #{cql}"
+
+    pool.cql cql, [
+      username,
+      friendname,
+      data,
+      version,
+      iv
+    ], (err, results) ->
+      if err?
+        logger.error "error inserting friend alias data for username: #{username}, friendname: #{friendname}"
+      callback(err,results)
+  else
+    callback()
+
+exports.remapFriendData = (row) ->
+  friend = new common.Friend null, 0
+
+  row.forEach (name, value, ts, ttl) ->
+    switch name
+      when 'friendname'
+        friend['name'] = value
+      when 'imageurl'
+        if value?
+          friend['imageUrl'] = value
+      when 'imageversion'
+        if value?
+          friend['imageVersion'] = value
+      when 'imageiv'
+        if value?
+          friend['imageIv'] = value
+      when 'aliasdata'
+        if value?
+          friend['aliasData'] = value
+      when 'aliasversion'
+        if value?
+          friend['aliasVersion'] = value
+      when 'aliasiv'
+        if value?
+          friend['aliasIv'] = value
+
+      else
+        return
+
+  return friend
+
+exports.remapFriendDatas = (results) ->
+  friendDatas = {}
+  #map to array of json messages
+  results.forEach (row) ->
+    friend = new common.Friend null, 0
+    row.forEach (name, value, ts, ttl) ->
+      switch name
+        when 'friendname'
+          friend['name'] = value
+        when 'imageurl'
+          if value?
+            friend['imageUrl'] = value
+        when 'imageversion'
+          if value?
+            friend['imageVersion'] = value
+        when 'imageiv'
+          if value?
+            friend['imageIv'] = value
+        when 'aliasdata'
+          if value?
+            friend['aliasData'] = value
+        when 'aliasversion'
+          if value?
+            friend['aliasVersion'] = value
+        when 'aliasiv'
+          if value?
+            friend['aliasIv'] = value
+
+        else
+          return
+
+    friendDatas[friend['name']] = friend
+
+  return friendDatas
+
+
+
+exports.getFriendData = (username, friendname, callback) ->
+  logger.debug "getFriendData, username: #{username}, friendname: #{friendname}"
+  cql = "select * from frienddata where username=? and friendname = ?;"
+  pool.cql cql, [username, friendname], (err, results) =>
+    if err
+      logger.error "error getting frienddata for username: #{username}"
+      return callback err
+    if results.length < 1
+      return callback null, null
+    if results.length > 1
+      return callback new Error 'getFriendData unexpected results.length > 1'
+    return callback null, @remapFriendData results[0]
+
+
+exports.getAllFriendData = (username, callback) ->
+  logger.debug "getAllFriendData, username: #{username}"
+  cql = "select * from frienddata where username=?;"
+  pool.cql cql, [username], (err, results) =>
+    if err
+      logger.error "error getting all frienddata for username: #{username}"
+      return callback err
+    return callback null, @remapFriendDatas results
+
+exports.deleteFriendData = (username, friendname, callback) ->
+  logger.debug "deleteFriendData, username: #{username}, friendname: #{friendname}"
+  cql = "delete from frienddata where username=? and friendname = ?;"
+  pool.cql cql, [username, friendname], callback
 
 
 #your mama
@@ -687,3 +829,19 @@ exports.migrateInsertPublicKeys = (username, keys, callback) ->
     keys.dsaPub,
     keys.dsaPubSig
   ], callback
+
+exports.migrateInsertFriendImageData = (username, friendname, key, value, callback) ->
+
+  cql =
+    "INSERT INTO frienddata (username, friendname, #{key}) VALUES (?,?,?);"
+
+  #logger.debug "sending cql #{cql}"
+
+  pool.cql cql, [
+    username,
+    friendname,
+    value
+  ], (err, results) ->
+    if err?
+      logger.error "error inserting friend image data for username: #{username}, friendname: #{friendname}"
+    callback(err,results)

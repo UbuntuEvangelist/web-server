@@ -849,21 +849,6 @@ else
     messageError.status = status
     return messageError
 
-  Friend = (name, flags, imageUrl, imageVersion, imageIv) ->
-    friend = {}
-    friend.name = name
-    friend.flags = flags
-    if imageUrl?
-      friend.imageUrl = imageUrl
-
-    if imageVersion?
-      friend.imageVersion = imageVersion
-
-    if imageIv?
-      friend.imageIv = imageIv
-    return friend
-
-
   createAndSendMessage = (from, fromVersion, to, toVersion, iv, data, mimeType, id, dataSize, time, resendId, callback) ->
     message = {}
     message.to = to
@@ -1494,18 +1479,17 @@ else
           logger.debug 'upload completed'
           url = rackspaceCdnImageBaseUrl + "/#{path}"
 
-          getFriendImageData username, otherUser, (err, friend) ->
+          cdb.getFriendData username, otherUser, (err, friend) ->
             if err?
-              logger.error "POST /images/:username/:version, error: #{err}"
-              deleteFile url, "image/"
-              return next err
+              logger.error "POST /images/#{username}/#{version}, error getting friend data: #{err}"
+            else
+              if friend?.imageUrl?
+                deleteFile friend.imageUrl, "image/"
 
-            if friend?.imageUrl?
-              deleteFile friend.imageUrl, "image/"
 
-            rc.hmset "fi:#{username}", "#{otherUser}:imageUrl", url, "#{otherUser}:imageVersion", version, "#{otherUser}:imageIv", iv, (err, status) ->
+            cdb.insertFriendImageData username, otherUser, url, version, iv, (err, results) ->
               if err?
-                logger.error "POST /images/:username/:version, error: #{err}"
+                logger.error "POST /images/#{username}/#{version}, error: #{err}"
                 deleteFile url, "image/"
                 return next err
 
@@ -2654,13 +2638,6 @@ else
 
           else return next new Error 'invalid action'
 
-
-  getFriendImageData = (username, friendname, callback) ->
-    rc.hmget "fi:#{username}", "#{friendname}:imageUrl", "#{friendname}:imageVersion", "#{friendname}:imageIv", (err, friendImageData) ->
-      return callback err if err?
-      callback null, new Friend friendname, 0, friendImageData[0], friendImageData[1], friendImageData[2]
-
-
   getFriends = (req, res, next) ->
     username = req.user.username
     #get users we're friends with
@@ -2669,43 +2646,49 @@ else
       friends = []
       return res.send {} unless rfriends?
 
-      _.each rfriends, (name) ->
-        #todo use bulk operation
-        getFriendImageData username, name, (err, friend) ->
-          return next err if err?
+      cdb.getAllFriendData username, (err, friendDatas) ->
+        return next err if err?
+
+        _.each rfriends, (name) ->
+          #if we have friend data use it, otherwise create a new friend object
+          friend = friendDatas[name]
+          if not friend?
+            friend = new common.Friend name, 0
           friends.push friend
 
-      #get users that invited us
-      rc.smembers "ir:#{username}", (err, invites) ->
-        return next err if err?
-        _.each invites, (name) -> friends.push new Friend name, 32
 
-        #get users that we invited
-        rc.smembers "is:#{username}", (err, invited) ->
+
+        #get users that invited us
+        rc.smembers "ir:#{username}", (err, invites) ->
           return next err if err?
-          _.each invited, (name) -> friends.push new Friend name, 2
+          _.each invites, (name) -> friends.push new common.Friend name, 32
 
-          #get users that deleted us that we haven't deleted
-          rc.smembers "ud:#{username}", (err, deleted) ->
+          #get users that we invited
+          rc.smembers "is:#{username}", (err, invited) ->
             return next err if err?
-            _.each deleted, (name) ->
+            _.each invited, (name) -> friends.push new common.Friend name, 2
 
-              friend = friends.filter (friend) -> friend.name is name
+            #get users that deleted us that we haven't deleted
+            rc.smembers "ud:#{username}", (err, deleted) ->
+              return next err if err?
+              _.each deleted, (name) ->
 
-              if friend.length is 1
-                friend[0].flags += 1
-              else
-                friends.push new Friend name, 1
+                friend = friends.filter (friend) -> friend.name is name
 
-            rc.hget "ucmcounters", username, (err, id) ->
-              friendstate = {}
-              friendstate.userControlId = id ? 0
-              friendstate.friends = friends
+                if friend.length is 1
+                  friend[0].flags += 1
+                else
+                  friends.push new common.Friend name, 1
 
-              sFriendState = JSON.stringify friendstate
-              logger.debug ("friendstate: " + sFriendState)
-              res.setHeader('Content-Type', 'application/json');
-              res.send sFriendState
+              rc.hget "ucmcounters", username, (err, id) ->
+                friendstate = {}
+                friendstate.userControlId = id ? 0
+                friendstate.friends = friends
+
+                sFriendState = JSON.stringify friendstate
+                logger.debug ("friendstate: " + sFriendState)
+                res.setHeader('Content-Type', 'application/json');
+                res.send friendstate
 
   app.get "/friends", ensureAuthenticated, setNoCache, getFriends
 
@@ -2916,7 +2899,6 @@ else
     #delete message pointers
     multi.del "m:#{username}"
     multi.del "f:#{username}"
-    multi.del "fi:#{username}"
     multi.del "is:#{username}"
     multi.del "u:#{username}"
     multi.del "ud:#{username}"
@@ -2943,11 +2925,14 @@ else
         multi.srem "c:#{username}", room
 
 
-        getFriendImageData username, theirUsername, (err, friend) ->
+        cdb.getFriendData username, theirUsername, (err, friend) ->
+          logger.error "error getting friend data #{err}" if err?
           if friend.imageUrl?
             deleteFile friend.imageUrl, "image/"
 
-        multi.hdel "fi:#{username}", "#{theirUsername}:imageUrl", "#{theirUsername}:imageVersion", "#{theirUsername}:imageIv"
+          cdb.deleteFriendData username, theirUsername, (err, results) ->
+            logger.error "error deleting friend data #{err}" if err?
+
 
         #todo delete related user control messages
 

@@ -5,3 +5,30 @@ exports.getSpotName = (from, to) ->
 exports.getOtherSpotUser = (spot, user) ->
   users = spot.split ":"
   if user == users[0] then return users[1] else return users[0]
+
+exports.Friend = (name, flags, imageUrl, imageVersion, imageIv, aliasData, aliasVersion, aliasIv) ->
+  friend = {}
+  friend.flags = flags
+
+  if name?
+    friend.name = name
+
+  if imageUrl?
+    friend.imageUrl = imageUrl
+
+  if imageVersion?
+    friend.imageVersion = imageVersion
+
+  if imageIv?
+    friend.imageIv = imageIv
+
+  if aliasData?
+    friend.aliasData = aliasData
+
+  if aliasVersion?
+    friend.aliasVersion = aliasVersion
+
+  if aliasIv
+    friend.aliasIv = aliasIv
+
+  return friend
