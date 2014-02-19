@@ -139,14 +139,14 @@ exports.getMessages = (username, spot, count, asArrayOfJsonStrings, callback) ->
     return callback null, @remapMessages results, true, asArrayOfJsonStrings
 
 
-exports.getMessagesBeforeId = (username, spot, id, callback) ->
+exports.getMessagesBeforeId = (username, spot, id, asArrayOfJsonStrings, callback) ->
   logger.debug "getMessagesBeforeId, username: #{username}, spot: #{spot}, id: #{id}"
   cql = "select * from chatmessages where username=? and spotname=? and id<? order by spotname desc limit 60;"
   pool.cql cql, [username, spot, id], (err, results) =>
     if err
       logger.error "error getting messages before id for #{username}, spot: #{spot}, id: #{id}"
       return callback err
-    return callback null, @remapMessages results, true, true
+    return callback null, @remapMessages results, true, asArrayOfJsonStrings
 
 
 exports.getMessagesAfterId = (username, spot, id, asArrayOfJsonStrings, callback) ->
@@ -287,7 +287,7 @@ exports.updateMessageShareable = (room, id, bShareable, callback) ->
 
 #message control message stuff
 
-exports.remapControlMessages = (results, reverse) ->
+exports.remapControlMessages = (results, reverse, asArrayOfJsonStrings) ->
   messages = []
   #map to array of json messages
   results.forEach (row) ->
@@ -303,35 +303,35 @@ exports.remapControlMessages = (results, reverse) ->
 
     #insert at begining to reverse order
     if reverse
-      messages.unshift JSON.stringify(message)
+      messages.unshift if asArrayOfJsonStrings then JSON.stringify(message) else message
     else
-      messages.push JSON.stringify(message)
+      messages.push if asArrayOfJsonStrings then JSON.stringify(message) else message
 
   return messages
 
-exports.getControlMessages = (username, room, count, callback) ->
+exports.getControlMessages = (username, room, count, asArrayOfJsonStrings, callback) ->
   cql = "select * from messagecontrolmessages where username=? and spotname=? order by spotname desc limit #{count};"
   pool.cql cql, [username, room], (err, results) =>
     if err
       logger.error "error getting message control messages for #{username}, room: #{room}, count: #{count}"
       return callback err
-    return callback null, @remapControlMessages results, true
+    return callback null, @remapControlMessages results, true, asArrayOfJsonStrings
 
 
-exports.getControlMessagesAfterId = (username, spot, id, callback) ->
+exports.getControlMessagesAfterId = (username, spot, id, asArrayOfJsonStrings, callback) ->
   logger.debug "getControlMessagesAfterId, username: #{username}, spot: #{spot}, id: #{id}"
   if id is -1
     callback null, null
   else
     if id is 0
-      this.getControlMessages username, spot, 60, callback
+      this.getControlMessages username, spot, 60, asArrayOfJsonStrings, callback
     else
       cql = "select * from messagecontrolmessages where username=? and spotname=? and id > ? order by spotname desc;"
       pool.cql cql, [username, spot, id], (err, results) =>
         if err
           logger.error "error getting message control messages for #{username}, spot: #{spot}, id: #{id}"
           return callback err
-        messages = @remapControlMessages results, true
+        messages = @remapControlMessages results, true, asArrayOfJsonStrings
         return callback null, messages
 
 exports.insertMessageControlMessage = (spot, message, callback) ->
@@ -440,7 +440,7 @@ exports.insertUserControlMessage = (username, message, callback) ->
 
   pool.cql cql, params, callback
 
-exports.remapUserControlMessages = (results, reverse) ->
+exports.remapUserControlMessages = (results, reverse, asArrayOfJsonStrings) ->
   messages = []
   #map to array of json messages
   results.forEach (row) ->
@@ -459,35 +459,36 @@ exports.remapUserControlMessages = (results, reverse) ->
 
     #insert at begining to reverse order
     if reverse
-      messages.unshift JSON.stringify(message)
+      messages.unshift if asArrayOfJsonStrings then JSON.stringify(message) else message
     else
-      messages.push JSON.stringify(message)
+      messages.push if asArrayOfJsonStrings then JSON.stringify(message) else message
 
   return messages
 
-exports.getUserControlMessages = (username, count, callback) ->
+exports.getUserControlMessages = (username, count, asArrayOfJsonStrings, callback) ->
   cql = "select * from usercontrolmessages where username=? order by id desc limit #{count};"
   pool.cql cql, [username], (err, results) =>
     if err
       logger.error "error getting user control messages for #{username}, count: #{count}"
       return callback err
-    return callback null, @remapUserControlMessages results, true
+    return callback null, @remapUserControlMessages results, true, asArrayOfJsonStrings
 
-exports.getUserControlMessagesAfterId = (username, id, callback) ->
+exports.getUserControlMessagesAfterId = (username, id, asArrayOfJsonStrings, callback) ->
   logger.debug "getUserControlMessagesAfterId, username: #{username}, id: #{id}"
   if id is -1
     callback null, null
   else
     if id is 0
-      this.getUserControlMessages username, 20, callback
+      this.getUserControlMessages username, 20, asArrayOfJsonStrings, callback
     else
       cql = "select * from usercontrolmessages where username=? and id > ? order by id desc;"
       pool.cql cql, [username, id], (err, results) =>
         if err
           logger.error "error getting user control messages for #{username}, id: #{id}"
           return callback err
-        messages = @remapUserControlMessages results, true
+        messages = @remapUserControlMessages results, true, asArrayOfJsonStrings
         return callback null, messages
+
 
 exports.deleteUserControlMessages = (username, messageIds, callback) ->
   #logger.debug "deleteAllMessages messageIds: #{JSON.stringify(messageIds)}"

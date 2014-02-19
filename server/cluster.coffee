@@ -1206,6 +1206,8 @@ else
 
     iv = message.iv
     return callback new MessageError(user, 400) unless iv?
+    cipherdata = message.data
+    return callback new MessageError(user, 400) unless cipherdata?
     to = message.to
     return callback new MessageError(iv, 400) unless to?
     from = message.from
@@ -1233,7 +1235,6 @@ else
             return callback new MessageError(iv, 500) if err?
             return callback new MessageError(iv, 403) if not aFriend
 
-            cipherdata = message.data
             resendId = message.resendId
 
             createAndSendMessage from, fromVersion, to, toVersion, iv, cipherdata, "text/plain", null, null, Date.now(), resendId, callback
@@ -1646,8 +1647,7 @@ else
       else
         callback null, null
 
-
-  getLatestUserControlMessages = (username, userControlId, callback) ->
+  getLatestUserControlMessages = (username, userControlId, asArrayOfJsonString,  callback) ->
     rc.hget "ucmcounters", username, (err, latestUserControlId) ->
       return callback err if err?
 
@@ -1657,9 +1657,92 @@ else
       logger.debug "comparing userControlId: #{userControlId} with latestUserControlId: #{latestUserControlId}"
 
       if userControlId < latestUserControlId
-        cdb.getUserControlMessagesAfterId username, userControlId, callback
+        cdb.getUserControlMessagesAfterId username, userControlId, asArrayOfJsonString, callback
       else
         callback()
+
+  #get all the optimized data we need in one call
+  app.post "/optdata/:userControlId", ensureAuthenticated, setNoCache, (req, res, next) ->
+    #need array of {un: username, mid: , cmid: }
+
+    username = req.user.username
+    userControlId = parseInt req.params.userControlId, 10
+    return next new Error 'no userControlId' unless userControlId? and not Number.isNaN(userControlId)
+
+    spotIds = undefined
+    try
+      logger.debug "optdata, spotIds: #{req.body.spotIds}"
+      spotIds = JSON.parse req.body.spotIds
+    catch error
+
+    getLatestUserControlMessages username, userControlId, false, (err, userControlMessages) ->
+      return next err if err?
+
+      data =  {}
+      if userControlMessages?.length > 0
+        logger.debug "got new user control messages: #{userControlMessages}"
+        data.userControlMessages = userControlMessages
+
+      getConversationIds req.user.username, (err, conversationIds) ->
+        return next err if err?
+
+        return res.send data unless conversationIds?
+        controlIdKeys = []
+        latestMessageIds = {}
+
+        async.each(
+          conversationIds
+          (item, callback) ->
+            controlIdKeys.push "#{item.conversation}"
+            logger.debug "setting latest message id: #{item.id} for conversation: #{item.conversation}"
+            latestMessageIds[item.conversation] = item.id
+            callback()
+          (err) ->
+            return next err if err?
+            #Get control ids
+            rc.hmget "mcmcounters", controlIdKeys, (err, rControlIds) ->
+              return next err if err?
+              controlIds = {}
+              _.each(
+                rControlIds
+                (controlId, i) ->
+                  if controlId isnt null
+                    conversation = conversationIds[i].conversation
+
+                    logger.debug "setting latest control id: #{controlId} for conversation: #{conversation}"
+                    controlIds[conversation] =  controlId)
+
+              if latestMessageIds?
+                data.conversationIds = latestMessageIds
+
+              if controlIds.length > 0
+                data.controlIds = controlIds
+
+              addNewMessages = (callback) ->
+                if spotIds?.length > 0
+                  messages = []
+                  #get messages
+                  async.each(
+                    spotIds,
+                    (item, callback1) ->
+                      spot = common.getSpotName username, item.u
+                      getMessagesAndControlMessagesOpt(username, item.u, parseInt(item.m, 10),  latestMessageIds[spot], parseInt(item.cm, 10), controlIds[spot], false, (err, data) ->
+                        return callback1() if err?
+                        if data?
+                          messages.push data
+                        callback1())
+                    (err) ->
+                      if messages.length > 0
+                        data.messageData = messages
+                      callback())
+                else
+                  callback()
+
+              addNewMessages ->
+                sData = JSON.stringify(data)
+                logger.debug "/optdata sending #{sData}"
+                res.set {'Content-Type': 'application/json'}
+                res.send data)
 
   #get all the data we need in one call
   app.post "/latestdata/:userControlId", ensureAuthenticated, setNoCache, (req, res, next) ->
@@ -1675,7 +1758,7 @@ else
       spotIds = JSON.parse req.body.spotIds
     catch error
 
-    getLatestUserControlMessages username, userControlId, (err, userControlMessages) ->
+    getLatestUserControlMessages username, userControlId, true, (err, userControlMessages) ->
       return next err if err?
 
       data =  {}
@@ -1727,7 +1810,7 @@ else
                     spotIds,
                     (item, callback1) ->
                       spot = common.getSpotName username, item.username
-                      getMessagesAndControlMessagesOpt(username, item.username, parseInt(item.messageid, 10),  latestMessageIds[spot], parseInt(item.controlmessageid, 10), latestControlIds[spot],(err, data) ->
+                      getMessagesAndControlMessagesOpt(username, item.username, parseInt(item.messageid, 10),  latestMessageIds[spot], parseInt(item.controlmessageid, 10), latestControlIds[spot], true, (err, data) ->
                         return callback1() if err?
                         if data?
                           messages.push data
@@ -1750,7 +1833,7 @@ else
     logger.debug "#{req.user.username} /latestids/#{userControlId}"
     return next new Error 'no userControlId' unless userControlId? and not Number.isNaN(userControlId)
 
-    getLatestUserControlMessages req.user.username, userControlId, (err, userControlMessages) ->
+    getLatestUserControlMessages req.user.username, userControlId, true, (err, userControlMessages) ->
       return next err if err?
 
       data =  {}
@@ -1796,13 +1879,53 @@ else
     id = parseInt req.params.messageid, 10
     return res.send 400 unless id? and not Number.isNaN(id)
 
-    cdb.getMessagesBeforeId req.user.username, common.getSpotName(req.user.username, req.params.username), id, (err, data) ->
+    cdb.getMessagesBeforeId req.user.username, common.getSpotName(req.user.username, req.params.username), id, true, (err, data) ->
       return next err if err?
       #sData = JSON.stringify(data)
 
       #logger.debug "sending #{sData}"
       res.set {'Content-Type': 'application/json'}
       res.send data
+
+
+  app.get "/messagesopt/:username/before/:messageid", ensureAuthenticated, validateUsernameExistsOrDeleted, validateAreFriendsOrDeleted, setNoCache, (req, res, next) ->
+    #return messages since id
+    id = parseInt req.params.messageid, 10
+    return res.send 400 unless id? and not Number.isNaN(id)
+
+    cdb.getMessagesBeforeId req.user.username, common.getSpotName(req.user.username, req.params.username), id, false, (err, data) ->
+      return next err if err?
+      #sData = JSON.stringify(data)
+
+      #logger.debug "sending #{sData}"
+      res.set {'Content-Type': 'application/json'}
+      res.send data
+
+  app.get "/messagedataopt/:username/:messageid/:controlmessageid", ensureAuthenticated, validateUsernameExistsOrDeleted, validateAreFriendsOrDeleted, setNoCache, (req, res, next) ->
+
+    messageId = parseInt req.params.messageid, 10
+    return next new Error 'message id required' unless messageId? and not Number.isNaN(messageId)
+
+    messageControlId = parseInt req.params.controlmessageid, 10
+    return next new Error 'control message id required' unless messageControlId? and not Number.isNaN(messageControlId)
+
+    #get latest ids
+    spot = common.getSpotName req.user.username, req.params.username
+    multi = rc.multi()
+    multi.hget "mcounters", spot
+    multi.hget "mcmcounters", spot
+    multi.exec (err, results) ->
+      return next err if err?
+      getMessagesAndControlMessagesOpt req.user.username, req.params.username, messageId, results[0], messageControlId, results[1], false, (err, data) ->
+        return next err if err?
+        if data?
+          sData = JSON.stringify(data)
+          logger.debug "sending: #{sData}"
+          res.set {'Content-Type': 'application/json'}
+          res.send data
+        else
+          logger.debug "no new messages for user #{req.user.username} for friend #{req.params.username}"
+          res.send 204
 
   app.get "/messagedata/:username/:messageid/:controlmessageid", ensureAuthenticated, validateUsernameExistsOrDeleted, validateAreFriendsOrDeleted, setNoCache, (req, res, next) ->
 
@@ -1819,7 +1942,7 @@ else
     multi.hget "mcmcounters", spot
     multi.exec (err, results) ->
       return next err if err?
-      getMessagesAndControlMessagesOpt req.user.username, req.params.username, messageId, results[0], messageControlId, results[1], (err, data) ->
+      getMessagesAndControlMessagesOpt req.user.username, req.params.username, messageId, results[0], messageControlId, results[1], true, (err, data) ->
         return next err if err?
         if data?
           sData = JSON.stringify(data)
@@ -1831,7 +1954,7 @@ else
           res.send 204
 
 
-  getMessagesAndControlMessagesOpt = (username, friendname, messageId, latestMessageId, controlMessageId, latestControlMessageId, callback) ->
+  getMessagesAndControlMessagesOpt = (username, friendname, messageId, latestMessageId, controlMessageId, latestControlMessageId, asArrayOfJsonStrings, callback) ->
     logger.debug "getMessagesAndControlMessagesOpt username: #{username}, friendname: #{friendname}, messageId: #{messageId}, latestMessageId: #{latestMessageId}, controlMessageId: #{controlMessageId}, latestControlMessageId: #{latestControlMessageId}"
     spot = common.getSpotName(username, friendname)
     data = {}
@@ -1841,7 +1964,7 @@ else
 
       if messageId < 0 then messageId = latestMessageId
       if (messageId < latestMessageId)
-        cdb.getMessagesAfterId username, spot, messageId, true, (err, messageData) ->
+        cdb.getMessagesAfterId username, spot, messageId, asArrayOfJsonStrings, (err, messageData) ->
           return callback err if err?
           if messageData?.length > 0
             data.messages = messageData
@@ -1856,7 +1979,7 @@ else
         if controlMessageId < 0 then controlMessageId = latestControlMessageId
         if (controlMessageId < latestControlMessageId)
           #return messages since id
-          cdb.getControlMessagesAfterId username, spot, controlMessageId, (err, controlData) ->
+          cdb.getControlMessagesAfterId username, spot, controlMessageId, asArrayOfJsonStrings, (err, controlData) ->
             return callback err if err?
             if controlData?.length > 0
               data.controlMessages = controlData
