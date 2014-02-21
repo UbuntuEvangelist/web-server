@@ -186,19 +186,19 @@ else
     logger.warn "use redis sentinel: #{useRedisSentinel}"
     logger.warn "cassandra urls: #{process.env.SURESPOT_CASSANDRA_IPS ? '127.0.0.1'}"
 
-  sio = undefined
-  sessionStore = undefined
-  rc = undefined
-  rcs = undefined
-  pub = undefined
-  sub = undefined
-  redback = undefined
-  client = undefined
-  client2 = undefined
-  app = undefined
-  ssloptions = undefined
-  oauth2Client = undefined
-  iapClient = undefined
+  sio = null
+  sessionStore = null
+  rc = null
+  rcs = null
+  pub = null
+  sub = null
+  redback = null
+  client = null
+  client2 = null
+  app = null
+  ssloptions = null
+  oauth2Client = null
+  iapClient = null
 
   cdb.connect (err) ->
     if err?
@@ -213,7 +213,7 @@ else
 
   iapClient = new IAPVerifier iapSecret
 
-  redis = undefined
+  redis = null
   if useRedisSentinel
     redis = require 'redis-sentinel-client'
   else
@@ -258,7 +258,7 @@ else
       else
         return tempclient
   #ec
-  serverPrivateKey = undefined
+  serverPrivateKey = null
   serverPrivateKey = fs.readFileSync("ec#{env}/priv.pem")
 
   #ssl
@@ -681,7 +681,7 @@ else
       #see if we have valid voice messaging product id
       #looks like you get different results for different receipts ?@$$@#%
       inapp = data?.receipt?.in_app
-      transactionid = undefined
+      transactionid = null
       if inapp?
         #iterate through inapp purchases
         transaction = _.find(inapp, (purchase) -> purchase.product_id is "voice_messaging")
@@ -1177,7 +1177,7 @@ else
 
 
 
-    message = undefined
+    message = null
     #todo check from and to exist and are friends
     try
       message = JSON.parse(data)
@@ -1669,7 +1669,7 @@ else
     userControlId = parseInt req.params.userControlId, 10
     return next new Error 'no userControlId' unless userControlId? and not Number.isNaN(userControlId)
 
-    spotIds = undefined
+    spotIds = null
     try
       logger.debug "optdata, spotIds: #{req.body.spotIds}"
       spotIds = JSON.parse req.body.spotIds
@@ -1752,7 +1752,7 @@ else
     userControlId = parseInt req.params.userControlId, 10
     return next new Error 'no userControlId' unless userControlId? and not Number.isNaN(userControlId)
 
-    spotIds = undefined
+    spotIds = null
     try
       logger.debug "latestdata, spotIds: #{req.body.spotIds}"
       spotIds = JSON.parse req.body.spotIds
@@ -2114,7 +2114,7 @@ else
           user.gcmId = req.body.gcmId
 
 
-        referrers = undefined
+        referrers = null
 
         if req.body?.referrers?
           try
