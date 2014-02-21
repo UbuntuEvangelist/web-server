@@ -2153,7 +2153,7 @@ else
                   return next err if err?
                   os = uaparser.parseOS req.headers['user-agent']
                   family = os.family
-                  logger.info "#{username} created, uid: #{user.id}, family: #{family}"
+                  logger.warn "#{username} created, uid: #{user.id}, family: #{family}"
                   req.login user, ->
                     req.user = user
 
