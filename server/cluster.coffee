@@ -689,7 +689,7 @@ else
         if valid
           transactionid = transaction.original_transaction_id
       else
-        if data.receipt.product_id is "voice_messaging"
+        if data?.receipt?.product_id? is "voice_messaging"
           transactionid = data.receipt.original_transaction_id
           valid = true
         else
