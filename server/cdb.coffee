@@ -425,7 +425,7 @@ exports.insertUserControlMessage = (username, message, callback) ->
     insert += ", moredata) "
     values += ", ?);"
     #store moredata object as json string in case of friend image data
-    if message.action is 'friendImage'
+    if message.action is 'friendImage' or message.action is 'friendAlias'
       message.moredata = JSON.stringify(message.moredata)
 
     params.push message.moredata
@@ -454,7 +454,7 @@ exports.remapUserControlMessages = (results, reverse, asArrayOfJsonStrings) ->
 
 
     #parse json if it's friendImage
-    if message.action is 'friendImage'
+    if message.action is 'friendImage' or message.action is 'friendAlias'
       message.moredata = JSON.parse(message.moredata)
 
     #insert at begining to reverse order

@@ -1437,6 +1437,24 @@ else
         return next err if err?
         res.send newStatus
 
+  app.put "/users/:username/alias", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
+
+    username = req.user.username
+    friendname = req.params.username
+    version = req.body.version
+    return res.send 400 unless version?
+    data = req.body.data
+    return res.send 400 unless data?
+    iv = req.body.iv
+    return res.send 400 unless iv?
+
+    cdb.insertFriendAliasData username, friendname, data, version, iv, (err, results) ->
+      return next err if err?
+      createAndSendUserControlMessage username, "friendAlias", friendname, { data: data, iv: iv, version: version }, (err) ->
+        if err?
+          logger.error "/users/#{username}/alias/#{version}, error creating and sending user control message: #{err}"
+        res.send 204
+
 
 
   app.post "/images/:username/:version", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
@@ -1444,6 +1462,7 @@ else
     username = req.user.username
     otherUser = req.params.username
     version = req.params.version
+    return res.send 400 unless version?
 
     form = new formidable.IncomingForm()
     form.onPart = (part) ->
