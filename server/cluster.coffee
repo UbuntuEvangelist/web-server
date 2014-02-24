@@ -2543,6 +2543,8 @@ else
     multi.sadd "f:#{friendname}", username
     multi.srem "ud:#{username}", friendname
     multi.srem "ud:#{friendname}", username
+    multi.srem "od:#{username}", friendname
+    multi.srem "od:#{friendname}", username
     multi.exec (err, results) ->
       return callback new Error("createFriendShip failed for username: " + username + ", friendname" + friendname) if err?
       createAndSendUserControlMessage username, "added", friendname, username, (err) ->
@@ -2830,8 +2832,15 @@ else
 
                                   #if we don't have any friends aww, just blow everything away
                                   nofriends = (callback) ->
+
                                     if friends.length is 0
-                                      deleteRemainingIdentityData multi, username, callback
+                                      #if we deleted someone but they haven't deleted us yet
+                                      #this set will be populated
+                                      rc.scard "od:#{username}", (err, card) ->
+                                        if card is 0
+                                          deleteRemainingIdentityData multi, username, callback
+                                        else
+                                          callback()
                                     else
                                       callback()
 
@@ -2922,6 +2931,7 @@ else
     multi.del "u:#{username}"
     multi.del "ud:#{username}"
     multi.del "c:#{username}"
+    multi.del "od:#{username}"
     multi.hdel "ucmcounters", username
     multi.srem "d", username
 
@@ -2978,18 +2988,21 @@ else
                 multi.srem "f:#{username}", theirUsername
                 multi.srem "f:#{theirUsername}", username
 
-                #add me to their set of deleted users if they're not deleted
                 rc.sismember "d", theirUsername, (err, isDeleted) ->
                   return next err if err?
                   if not isDeleted
+                    #add them to my deleted users set
+                    multi.sadd "od:#{username}", theirUsername
+                    #add me to their set of deleted users if they're not deleted
                     multi.sadd "ud:#{theirUsername}", username
                   next()
 
           #they've already deleted me
           else
-            #remove them from their deleted set (if they deleted their identity) (don't use multi so we can check card post removal later)
+            #remove me from their deleted set (if they deleted their identity) (don't use multi so we can check card post removal later)
             rc.srem "d:#{theirUsername}", username, (err, rCount) ->
               return next err if err?
+
               #if they have been deleted and we are the last person to delete them
               #remove the final pieces of data
               rc.sismember "d", theirUsername, (err, isDeleted) ->
@@ -3034,6 +3047,9 @@ else
 
                       #remove them from my deleted set
                       multi.srem "ud:#{username}", theirUsername
+
+                      #remove me from their deleted set
+                      multi.srem "od:#{theirUsername}", username
 
                       cdb.deleteAllMessages room, (err, results) ->
                         logger.error "Could not delete spot #{room} messages" if err?
