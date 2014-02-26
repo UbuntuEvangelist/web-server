@@ -2086,7 +2086,7 @@ else
     logger.debug "version: #{version}"
 
     #work around ios filesystem insanity for now
-    return res.send 409 unless validator.isAlphanumeric req.params.username
+    return res.send 409 unless validator.isAlphanumeric req.body.username
 
     userExistsOrDeleted username, true, (err, exists) ->
       return next err if err?
