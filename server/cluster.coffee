@@ -2416,6 +2416,7 @@ else
 
 
   inviteUser = (username, friendname, source, callback) ->
+    return callback null, false unless friendname?
     #keep running count of autoinvites
     if source?
       logger.info "#{username} invited #{friendname} via #{source}"
