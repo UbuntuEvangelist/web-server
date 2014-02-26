@@ -35,6 +35,7 @@ bunyan = require 'bunyan'
 IAPVerifier = require 'iap_verifier'
 cdb = require './cdb'
 common = require './common'
+validator = require 'validator'
 
 #constants
 USERNAME_LENGTH = 20
@@ -2084,6 +2085,9 @@ else
 
     logger.debug "version: #{version}"
 
+    #work around ios filesystem insanity for now
+    return res.send 409 unless validator.isAlphanumeric req.params.username
+
     userExistsOrDeleted username, true, (err, exists) ->
       return next err if err?
       if exists
@@ -2162,7 +2166,14 @@ else
                     else
                       next()
 
-  app.get "/users/:username/exists", setNoCache, (req, res, next) ->
+  checkUsername = (req, res, next) ->
+    logger.debug "checking #{req.params.username}"
+    #don't let them create anything but alpha numeric english usernames till we fix it on ios
+    return res.send true unless validator.isAlphanumeric req.params.username
+    next()
+
+
+  app.get "/users/:username/exists", setNoCache, checkUsername, (req, res, next) ->
     logger.debug "/users/#{req.params.username}/exists"
     userExistsOrDeleted req.params.username, true, (err, exists) ->
       return next err if err?
