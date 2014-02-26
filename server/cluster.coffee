@@ -2076,17 +2076,18 @@ else
         #res.render 'autoinviteIosAlpha', {username: req.params.username}
 
 
-
-
   createNewUser = (req, res, next) ->
     username = req.body.username
     password = req.body.password
     version = req.body.version
+    platform = req.body.platform
 
-    logger.debug "version: #{version}"
+    #ios version 1 can't save identities with extended chars properly
+    if platform is 'ios'
+      isAlpha = validator.isAlphanumeric req.body.username
 
-    #work around ios filesystem insanity for now
-    return res.send 409 unless validator.isAlphanumeric req.body.username
+      #tell them to upgrade unless all chars are alpha or we're not on v1.1
+      return res.send 403 unless isAlpha or version isnt "1:1"
 
     userExistsOrDeleted username, true, (err, exists) ->
       return next err if err?
@@ -2155,9 +2156,7 @@ else
                 multi.sadd "u", username
                 multi.exec (err,replies) ->
                   return next err if err?
-                  os = uaparser.parseOS req.headers['user-agent']
-                  family = os.family
-                  logger.warn "#{username} created, uid: #{user.id}, family: #{family}"
+                  logger.warn "#{username} created, uid: #{user.id}, platform: #{platform}, version: #{version}"
                   req.login user, ->
                     req.user = user
 
@@ -2172,7 +2171,7 @@ else
     return res.send true unless validator.isAlphanumeric req.params.username
     next()
 
-
+  #remove checkUsername once v2 propagated
   app.get "/users/:username/exists", setNoCache, checkUsername, (req, res, next) ->
     logger.debug "/users/#{req.params.username}/exists"
     userExistsOrDeleted req.params.username, true, (err, exists) ->
