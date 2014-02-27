@@ -2085,20 +2085,21 @@ else
 
     return res.send 409 unless validator.isAlphanumeric req.body.username
     #ios version 1 can't save identities with extended chars properly
+#    isAlpha = validator.isAlphanumeric req.body.username
 #    if platform is 'ios'
-#      isAlpha = validator.isAlphanumeric req.body.username
-#
 #      #tell them to upgrade unless all chars are alpha or we're not on v1.1
 #      return res.send 403 unless isAlpha or version isnt "1:1"
-
+#
+#    #android < 49 doesn't handle some chars in auto invite links
+#    if platform is 'android'
+#      return res.send 403 unless isAlpha or version isnt "49"
+#
     userExistsOrDeleted username, true, (err, exists) ->
       return next err if err?
       if exists
         logger.debug "user already exists"
         return res.send 409
       else
-
-
         user = {}
         user.username = username
         user.kv = 1
