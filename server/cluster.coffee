@@ -529,7 +529,8 @@ else
               if isInvited
                 next()
               else
-                res.send 403
+                #nothing to do
+                res.send 204
 
 
   #is friendname a friend of username
@@ -2967,7 +2968,6 @@ else
 
         #delete the conversation with this user from the set of my conversations
         multi.srem "c:#{username}", room
-
 
         getFriendImageData username, theirUsername, (err, friend) ->
           if friend.imageUrl?
