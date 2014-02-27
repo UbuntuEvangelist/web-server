@@ -2082,12 +2082,13 @@ else
     version = req.body.version
     platform = req.body.platform
 
+    return res.send 409 unless validator.isAlphanumeric req.body.username
     #ios version 1 can't save identities with extended chars properly
-    if platform is 'ios'
-      isAlpha = validator.isAlphanumeric req.body.username
-
-      #tell them to upgrade unless all chars are alpha or we're not on v1.1
-      return res.send 403 unless isAlpha or version isnt "1:1"
+#    if platform is 'ios'
+#      isAlpha = validator.isAlphanumeric req.body.username
+#
+#      #tell them to upgrade unless all chars are alpha or we're not on v1.1
+#      return res.send 403 unless isAlpha or version isnt "1:1"
 
     userExistsOrDeleted username, true, (err, exists) ->
       return next err if err?
@@ -2825,6 +2826,9 @@ else
                             #add me to the global set of deleted users
                             multi.sadd "d", username
 
+                            #delete user data
+                            multi.del "u:#{username}"
+
                             #add user to each friend's set of deleted users
                             async.each(
                               friends,
@@ -3125,9 +3129,15 @@ else
     return done(null, 403) if signature?.length < 16
     userKey = "u:" + username
     logger.debug "validating: " + username
-    rcs.hgetall userKey, (err, user) ->
+
+    multi = rc.multi()
+    multi.sismember "u", username
+    multi.hgetall userKey
+    multi.exec (err, results) ->
       return done(err) if err?
-      return done null, 404 unless user?.password
+      return done null, 404 unless results[0]
+      user = results[1]
+      return done null, 404 unless user?.password?
       comparePassword password, user.password, (err, res) ->
         return done err if err?
         return done null, 403 unless res
