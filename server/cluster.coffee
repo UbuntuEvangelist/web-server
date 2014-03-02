@@ -349,7 +349,7 @@ else
     if req.headers.cookie
       parsedCookie = cookie.parse(req.headers.cookie)
       connectSid = parsedCookie["connect.sid"]
-      return accept 'no cookie', false unless connectSid?
+      return accept null, false unless connectSid?
 
       req.sessionID = utils.parseSignedCookie(connectSid, sessionSecret)
       sessionStore.get req.sessionID, (err, session) ->
