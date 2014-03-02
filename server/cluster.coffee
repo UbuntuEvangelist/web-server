@@ -362,7 +362,7 @@ else
           else
             accept null, false
     else
-      accept "No cookie transmitted.", false
+      accept null, false
 
   typeIsArray = Array.isArray || ( value ) -> return {}.toString.call( value ) is '[object Array]'
 
