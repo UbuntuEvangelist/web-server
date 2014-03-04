@@ -625,7 +625,7 @@ else
           rc.hset "t", "v:vm:#{token}", valid
 
 
-  updatePurchaseTokens = (username, purchaseTokens) ->
+  updatePurchaseTokens = (username, purchaseTokens, validate) ->
     voiceToken = purchaseTokens?.voice_messaging ? null
 
     #if we have something to update, update
@@ -651,13 +651,14 @@ else
             #set token to user
             multi.hset userKey, "vm", voiceToken
             #update token mapping to user
+            logger.debug "assigning voiceToken: #{voiceToken} to username: #{username}"
             multi.hset "t", "u:vm:#{voiceToken}", username
 
-            #if token different, remove old token mapping
-            if currtoken isnt voiceToken
+            #if token different, remove old token mapping and revalidate
+            if currtoken? and currtoken isnt voiceToken
               multi.hdel "t","u:vm:#{currtoken}"
               multi.hdel "t","v:vm:#{currtoken}"
-
+              validate = true
             callback()
         else
           #no token uploaded so perform check on existing token
@@ -669,8 +670,8 @@ else
       multi.exec (err, results) ->
         return if err?
 
-        #validate token with google and set on return
-        if voiceToken?
+        #validate token with google
+        if validate and voiceToken?
           validateVoiceToken username, voiceToken
 
 
@@ -733,7 +734,7 @@ else
 
 
 
-  updatePurchaseTokensMiddleware = (req, res, next) ->
+  updatePurchaseTokensMiddleware = (validate) -> (req, res, next) ->
     logger.debug "user #{req.user.username} received purchaseTokens #{req.body.purchaseTokens}, receipt: " + if req.body.purchaseReceipt? then "yes" else "no"
 
     purchaseTokens = req.body.purchaseTokens
@@ -744,7 +745,7 @@ else
         purchaseTokens = JSON.parse purchaseTokens
       catch error
 
-      updatePurchaseTokens(req.user.username, purchaseTokens)
+      updatePurchaseTokens(req.user.username, purchaseTokens, validate)
 
     if purchaseReceipt
       validateVoiceReceipt(req.user.username, purchaseReceipt)
@@ -764,7 +765,7 @@ else
         return callback null, valid is "true"
 
 
-  app.post "/updatePurchaseTokens", ensureAuthenticated, updatePurchaseTokensMiddleware, (req, res, next) ->
+  app.post "/updatePurchaseTokens", ensureAuthenticated, updatePurchaseTokensMiddleware(true), (req, res, next) ->
     res.send 204
 
 
@@ -1664,7 +1665,7 @@ else
         callback()
 
   #get all the optimized data we need in one call
-  app.post "/optdata/:userControlId", ensureAuthenticated, setNoCache, (req, res, next) ->
+  app.post "/optdata/:userControlId", ensureAuthenticated, updatePurchaseTokensMiddleware(false), setNoCache, (req, res, next) ->
     #need array of {un: username, mid: , cmid: }
 
     username = req.user.username
@@ -2266,13 +2267,13 @@ else
     createNewUser,
     passport.authenticate("local"),
     updatePushIds,
-    updatePurchaseTokensMiddleware,
+    updatePurchaseTokensMiddleware(true),
     (req, res, next) ->
       res.send 201
 
 
   #end unauth'd methods
-  app.post "/login", passport.authenticate("local"), validateVersion, updatePushIds, updatePurchaseTokensMiddleware, (req, res, next) ->
+  app.post "/login", passport.authenticate("local"), validateVersion, updatePushIds, updatePurchaseTokensMiddleware(true), (req, res, next) ->
     username = req.user.username
     logger.debug "/login post, user #{username}"
 
