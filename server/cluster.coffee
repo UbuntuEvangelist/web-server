@@ -35,6 +35,7 @@ bunyan = require 'bunyan'
 IAPVerifier = require 'iap_verifier'
 cdb = require './cdb'
 common = require './common'
+validator = require 'validator'
 
 #constants
 USERNAME_LENGTH = 20
@@ -123,82 +124,82 @@ if (cluster.isMaster and NUM_CORES > 1)
     logger.debug "worker #{worker.process.pid} died, forking another"
     cluster.fork()
 
-  logger.info "env: #{env}"
-  logger.info "database: #{database}"
-  logger.info "socket: #{socketPort}"
-  logger.info "address: #{bindAddress}"
-  logger.info "ssl: #{useSSL}"
-  logger.info "rate limiting messages: #{RATE_LIMITING_MESSAGE}, int: #{RATE_LIMIT_BUCKET_MESSAGE}, secs: #{RATE_LIMIT_SECS_MESSAGE}, rate: #{RATE_LIMIT_RATE_MESSAGE}"
-  logger.info "messages per user: #{MESSAGES_PER_USER}"
-  logger.info "debug level: #{debugLevel}"
-  logger.info "google api key: #{googleApiKey}"
-  logger.info "google client id: #{googleClientId}"
-  logger.info "google client secret: #{googleClientSecret}"
-  logger.info "google redirect url: #{googleRedirectUrl}"
-  logger.info "google oauth2 code: #{googleOauth2Code}"
-  logger.info "apple apn gateway: #{apnGateway}"
-  logger.info "rackspace api key: #{rackspaceApiKey}"
-  logger.info "rackspace image cdn url: #{rackspaceCdnImageBaseUrl}"
-  logger.info "rackspace image container: #{rackspaceImageContainer}"
-  logger.info "rackspace voice cdn url: #{rackspaceCdnVoiceBaseUrl}"
-  logger.info "rackspace voice container: #{rackspaceVoiceContainer}"
-  logger.info "rackspace username: #{rackspaceUsername}"
-  logger.info "iap secret: #{iapSecret}"
-  logger.info "session secret: #{sessionSecret}"
-  logger.info "cores: #{NUM_CORES}"
-  logger.info "console logging: #{logConsole}"
-  logger.info "use redis sentinel: #{useRedisSentinel}"
-  logger.info "redis sentinel hostname: #{redisSentinelHostname}"
-  logger.info "redis sentinel port: #{redisSentinelPort}"
-  logger.info "redis password: #{redisPassword}"
-  logger.info "cassandra urls: #{process.env.SURESPOT_CASSANDRA_IPS ? '127.0.0.1'}"
+  logger.warn "env: #{env}"
+  logger.warn "database: #{database}"
+  logger.warn "socket: #{socketPort}"
+  logger.warn "address: #{bindAddress}"
+  logger.warn "ssl: #{useSSL}"
+  logger.warn "rate limiting messages: #{RATE_LIMITING_MESSAGE}, int: #{RATE_LIMIT_BUCKET_MESSAGE}, secs: #{RATE_LIMIT_SECS_MESSAGE}, rate: #{RATE_LIMIT_RATE_MESSAGE}"
+  logger.warn "messages per user: #{MESSAGES_PER_USER}"
+  logger.warn "debug level: #{debugLevel}"
+  logger.warn "google api key: #{googleApiKey}"
+  logger.warn "google client id: #{googleClientId}"
+  logger.warn "google client secret: #{googleClientSecret}"
+  logger.warn "google redirect url: #{googleRedirectUrl}"
+  logger.warn "google oauth2 code: #{googleOauth2Code}"
+  logger.warn "apple apn gateway: #{apnGateway}"
+  logger.warn "rackspace api key: #{rackspaceApiKey}"
+  logger.warn "rackspace image cdn url: #{rackspaceCdnImageBaseUrl}"
+  logger.warn "rackspace image container: #{rackspaceImageContainer}"
+  logger.warn "rackspace voice cdn url: #{rackspaceCdnVoiceBaseUrl}"
+  logger.warn "rackspace voice container: #{rackspaceVoiceContainer}"
+  logger.warn "rackspace username: #{rackspaceUsername}"
+  logger.warn "iap secret: #{iapSecret}"
+  logger.warn "session secret: #{sessionSecret}"
+  logger.warn "cores: #{NUM_CORES}"
+  logger.warn "console logging: #{logConsole}"
+  logger.warn "use redis sentinel: #{useRedisSentinel}"
+  logger.warn "redis sentinel hostname: #{redisSentinelHostname}"
+  logger.warn "redis sentinel port: #{redisSentinelPort}"
+  logger.warn "redis password: #{redisPassword}"
+  logger.warn "cassandra urls: #{process.env.SURESPOT_CASSANDRA_IPS ? '127.0.0.1'}"
 
 else
 
   if NUM_CORES is 1
-    logger.info "env: #{env}"
-    logger.info "database: #{database}"
-    logger.info "socket: #{socketPort}"
-    logger.info "address: #{bindAddress}"
-    logger.info "ssl: #{useSSL}"
-    logger.info "rate limiting messages: #{RATE_LIMITING_MESSAGE}, secs: #{RATE_LIMIT_SECS_MESSAGE}, rate: #{RATE_LIMIT_RATE_MESSAGE}"
-    logger.info "messages per user: #{MESSAGES_PER_USER}"
-    logger.info "debug level: #{debugLevel}"
-    logger.info "google api key: #{googleApiKey}"
-    logger.info "google client id: #{googleClientId}"
-    logger.info "google client secret: #{googleClientSecret}"
-    logger.info "google redirect url: #{googleRedirectUrl}"
-    logger.info "google oauth2 code: #{googleOauth2Code}"
-    logger.info "apple apn gateway: #{apnGateway}"
-    logger.info "rackspace api key: #{rackspaceApiKey}"
-    logger.info "rackspace image cdn url: #{rackspaceCdnImageBaseUrl}"
-    logger.info "rackspace image container: #{rackspaceImageContainer}"
-    logger.info "rackspace voice cdn url: #{rackspaceCdnVoiceBaseUrl}"
-    logger.info "rackspace voice container: #{rackspaceVoiceContainer}"
-    logger.info "rackspace username: #{rackspaceUsername}"
-    logger.info "iap secret: #{iapSecret}"
-    logger.info "session secret: #{sessionSecret}"
-    logger.info "cores: #{NUM_CORES}"
-    logger.info "console logging: #{logConsole}"
-    logger.info "redis sentinel hostname: #{redisSentinelHostname}"
-    logger.info "redis sentinel port: #{redisSentinelPort}"
-    logger.info "redis password: #{redisPassword}"
-    logger.info "use redis sentinel: #{useRedisSentinel}"
-    logger.info "cassandra urls: #{process.env.SURESPOT_CASSANDRA_IPS ? '127.0.0.1'}"
+    logger.warn "env: #{env}"
+    logger.warn "database: #{database}"
+    logger.warn "socket: #{socketPort}"
+    logger.warn "address: #{bindAddress}"
+    logger.warn "ssl: #{useSSL}"
+    logger.warn "rate limiting messages: #{RATE_LIMITING_MESSAGE}, secs: #{RATE_LIMIT_SECS_MESSAGE}, rate: #{RATE_LIMIT_RATE_MESSAGE}"
+    logger.warn "messages per user: #{MESSAGES_PER_USER}"
+    logger.warn "debug level: #{debugLevel}"
+    logger.warn "google api key: #{googleApiKey}"
+    logger.warn "google client id: #{googleClientId}"
+    logger.warn "google client secret: #{googleClientSecret}"
+    logger.warn "google redirect url: #{googleRedirectUrl}"
+    logger.warn "google oauth2 code: #{googleOauth2Code}"
+    logger.warn "apple apn gateway: #{apnGateway}"
+    logger.warn "rackspace api key: #{rackspaceApiKey}"
+    logger.warn "rackspace image cdn url: #{rackspaceCdnImageBaseUrl}"
+    logger.warn "rackspace image container: #{rackspaceImageContainer}"
+    logger.warn "rackspace voice cdn url: #{rackspaceCdnVoiceBaseUrl}"
+    logger.warn "rackspace voice container: #{rackspaceVoiceContainer}"
+    logger.warn "rackspace username: #{rackspaceUsername}"
+    logger.warn "iap secret: #{iapSecret}"
+    logger.warn "session secret: #{sessionSecret}"
+    logger.warn "cores: #{NUM_CORES}"
+    logger.warn "console logging: #{logConsole}"
+    logger.warn "redis sentinel hostname: #{redisSentinelHostname}"
+    logger.warn "redis sentinel port: #{redisSentinelPort}"
+    logger.warn "redis password: #{redisPassword}"
+    logger.warn "use redis sentinel: #{useRedisSentinel}"
+    logger.warn "cassandra urls: #{process.env.SURESPOT_CASSANDRA_IPS ? '127.0.0.1'}"
 
-  sio = undefined
-  sessionStore = undefined
-  rc = undefined
-  rcs = undefined
-  pub = undefined
-  sub = undefined
-  redback = undefined
-  client = undefined
-  client2 = undefined
-  app = undefined
-  ssloptions = undefined
-  oauth2Client = undefined
-  iapClient = undefined
+  sio = null
+  sessionStore = null
+  rc = null
+  rcs = null
+  pub = null
+  sub = null
+  redback = null
+  client = null
+  client2 = null
+  app = null
+  ssloptions = null
+  oauth2Client = null
+  iapClient = null
 
   cdb.connect (err) ->
     if err?
@@ -213,7 +214,7 @@ else
 
   iapClient = new IAPVerifier iapSecret
 
-  redis = undefined
+  redis = null
   if useRedisSentinel
     redis = require 'redis-sentinel-client'
   else
@@ -258,7 +259,7 @@ else
       else
         return tempclient
   #ec
-  serverPrivateKey = undefined
+  serverPrivateKey = null
   serverPrivateKey = fs.readFileSync("ec#{env}/priv.pem")
 
   #ssl
@@ -348,7 +349,7 @@ else
     if req.headers.cookie
       parsedCookie = cookie.parse(req.headers.cookie)
       connectSid = parsedCookie["connect.sid"]
-      return accept 'no cookie', false unless connectSid?
+      return accept null, false unless connectSid?
 
       req.sessionID = utils.parseSignedCookie(connectSid, sessionSecret)
       sessionStore.get req.sessionID, (err, session) ->
@@ -361,7 +362,7 @@ else
           else
             accept null, false
     else
-      accept "No cookie transmitted.", false
+      accept null, false
 
   typeIsArray = Array.isArray || ( value ) -> return {}.toString.call( value ) is '[object Array]'
 
@@ -528,7 +529,8 @@ else
               if isInvited
                 next()
               else
-                res.send 403
+                #nothing to do
+                res.send 204
 
 
   #is friendname a friend of username
@@ -623,7 +625,7 @@ else
           rc.hset "t", "v:vm:#{token}", valid
 
 
-  updatePurchaseTokens = (username, purchaseTokens) ->
+  updatePurchaseTokens = (username, purchaseTokens, validate) ->
     voiceToken = purchaseTokens?.voice_messaging ? null
 
     #if we have something to update, update
@@ -649,13 +651,14 @@ else
             #set token to user
             multi.hset userKey, "vm", voiceToken
             #update token mapping to user
+            logger.debug "assigning voiceToken: #{voiceToken} to username: #{username}"
             multi.hset "t", "u:vm:#{voiceToken}", username
 
-            #if token different, remove old token mapping
-            if currtoken isnt voiceToken
+            #if token different, remove old token mapping and revalidate
+            if currtoken? and currtoken isnt voiceToken
               multi.hdel "t","u:vm:#{currtoken}"
               multi.hdel "t","v:vm:#{currtoken}"
-
+              validate = true
             callback()
         else
           #no token uploaded so perform check on existing token
@@ -667,8 +670,8 @@ else
       multi.exec (err, results) ->
         return if err?
 
-        #validate token with google and set on return
-        if voiceToken?
+        #validate token with google
+        if validate and voiceToken?
           validateVoiceToken username, voiceToken
 
 
@@ -681,7 +684,7 @@ else
       #see if we have valid voice messaging product id
       #looks like you get different results for different receipts ?@$$@#%
       inapp = data?.receipt?.in_app
-      transactionid = undefined
+      transactionid = null
       if inapp?
         #iterate through inapp purchases
         transaction = _.find(inapp, (purchase) -> purchase.product_id is "voice_messaging")
@@ -689,7 +692,7 @@ else
         if valid
           transactionid = transaction.original_transaction_id
       else
-        if data.receipt.product_id is "voice_messaging"
+        if data?.receipt?.product_id is "voice_messaging"
           transactionid = data.receipt.original_transaction_id
           valid = true
         else
@@ -731,7 +734,7 @@ else
 
 
 
-  updatePurchaseTokensMiddleware = (req, res, next) ->
+  updatePurchaseTokensMiddleware = (validate) -> (req, res, next) ->
     logger.debug "user #{req.user.username} received purchaseTokens #{req.body.purchaseTokens}, receipt: " + if req.body.purchaseReceipt? then "yes" else "no"
 
     purchaseTokens = req.body.purchaseTokens
@@ -742,7 +745,7 @@ else
         purchaseTokens = JSON.parse purchaseTokens
       catch error
 
-      updatePurchaseTokens(req.user.username, purchaseTokens)
+      updatePurchaseTokens(req.user.username, purchaseTokens, validate)
 
     if purchaseReceipt
       validateVoiceReceipt(req.user.username, purchaseReceipt)
@@ -762,7 +765,7 @@ else
         return callback null, valid is "true"
 
 
-  app.post "/updatePurchaseTokens", ensureAuthenticated, updatePurchaseTokensMiddleware, (req, res, next) ->
+  app.post "/updatePurchaseTokens", ensureAuthenticated, updatePurchaseTokensMiddleware(true), (req, res, next) ->
     res.send 204
 
 
@@ -1162,7 +1165,7 @@ else
 
 
 
-    message = undefined
+    message = null
     #todo check from and to exist and are friends
     try
       message = JSON.parse(data)
@@ -1665,14 +1668,14 @@ else
         callback()
 
   #get all the optimized data we need in one call
-  app.post "/optdata/:userControlId", ensureAuthenticated, setNoCache, (req, res, next) ->
+  app.post "/optdata/:userControlId", ensureAuthenticated, updatePurchaseTokensMiddleware(false), setNoCache, (req, res, next) ->
     #need array of {un: username, mid: , cmid: }
 
     username = req.user.username
     userControlId = parseInt req.params.userControlId, 10
     return next new Error 'no userControlId' unless userControlId? and not Number.isNaN(userControlId)
 
-    spotIds = undefined
+    spotIds = null
     try
       logger.debug "optdata, spotIds: #{req.body.spotIds}"
       spotIds = JSON.parse req.body.spotIds
@@ -1755,7 +1758,7 @@ else
     userControlId = parseInt req.params.userControlId, 10
     return next new Error 'no userControlId' unless userControlId? and not Number.isNaN(userControlId)
 
-    spotIds = undefined
+    spotIds = null
     try
       logger.debug "latestdata, spotIds: #{req.body.spotIds}"
       spotIds = JSON.parse req.body.spotIds
@@ -2078,23 +2081,29 @@ else
         #res.render 'autoinviteIosAlpha', {username: req.params.username}
 
 
-
-
   createNewUser = (req, res, next) ->
     username = req.body.username
     password = req.body.password
     version = req.body.version
+    platform = req.body.platform
 
-    logger.debug "version: #{version}"
-
+    return res.send 409 unless validator.isAlphanumeric req.body.username
+    #ios version 1 can't save identities with extended chars properly
+#    isAlpha = validator.isAlphanumeric req.body.username
+#    if platform is 'ios'
+#      #tell them to upgrade unless all chars are alpha or we're not on v1.1
+#      return res.send 403 unless isAlpha or version isnt "1:1"
+#
+#    #android < 49 doesn't handle some chars in auto invite links
+#    if platform is 'android'
+#      return res.send 403 unless isAlpha or version isnt "49"
+#
     userExistsOrDeleted username, true, (err, exists) ->
       return next err if err?
       if exists
         logger.debug "user already exists"
         return res.send 409
       else
-
-
         user = {}
         user.username = username
         user.kv = 1
@@ -2117,7 +2126,7 @@ else
           user.gcmId = req.body.gcmId
 
 
-        referrers = undefined
+        referrers = null
 
         if req.body?.referrers?
           try
@@ -2154,9 +2163,7 @@ else
                 multi.sadd "u", username
                 multi.exec (err,replies) ->
                   return next err if err?
-                  os = uaparser.parseOS req.headers['user-agent']
-                  family = os.family
-                  logger.info "#{username} created, uid: #{user.id}, family: #{family}"
+                  logger.warn "#{username} created, uid: #{user.id}, platform: #{platform}, version: #{version}"
                   req.login user, ->
                     req.user = user
 
@@ -2165,7 +2172,15 @@ else
                     else
                       next()
 
-  app.get "/users/:username/exists", setNoCache, (req, res, next) ->
+  checkUsername = (req, res, next) ->
+    logger.debug "checking #{req.params.username}"
+    #don't let them create anything but alpha numeric english usernames till we fix it on ios
+    return res.send true unless validator.isAlphanumeric req.params.username
+    next()
+
+  #remove checkUsername once v2 propagated
+  app.get "/users/:username/exists", setNoCache, checkUsername, (req, res, next) ->
+    logger.debug "/users/#{req.params.username}/exists"
     userExistsOrDeleted req.params.username, true, (err, exists) ->
       return next err if err?
       res.send exists
@@ -2255,13 +2270,13 @@ else
     createNewUser,
     passport.authenticate("local"),
     updatePushIds,
-    updatePurchaseTokensMiddleware,
+    updatePurchaseTokensMiddleware(true),
     (req, res, next) ->
       res.send 201
 
 
   #end unauth'd methods
-  app.post "/login", passport.authenticate("local"), validateVersion, updatePushIds, updatePurchaseTokensMiddleware, (req, res, next) ->
+  app.post "/login", passport.authenticate("local"), validateVersion, updatePushIds, updatePurchaseTokensMiddleware(true), (req, res, next) ->
     username = req.user.username
     logger.debug "/login post, user #{username}"
 
@@ -2408,6 +2423,7 @@ else
 
 
   inviteUser = (username, friendname, source, callback) ->
+    return callback null, false unless friendname?
     #keep running count of autoinvites
     if source?
       logger.info "#{username} invited #{friendname} via #{source}"
@@ -2545,6 +2561,8 @@ else
     multi.sadd "f:#{friendname}", username
     multi.srem "ud:#{username}", friendname
     multi.srem "ud:#{friendname}", username
+    multi.srem "od:#{username}", friendname
+    multi.srem "od:#{friendname}", username
     multi.exec (err, results) ->
       return callback new Error("createFriendShip failed for username: " + username + ", friendname" + friendname) if err?
       createAndSendUserControlMessage username, "added", friendname, username, (err) ->
@@ -2813,6 +2831,9 @@ else
                             #add me to the global set of deleted users
                             multi.sadd "d", username
 
+                            #delete user data
+                            multi.del "u:#{username}"
+
                             #add user to each friend's set of deleted users
                             async.each(
                               friends,
@@ -2831,8 +2852,15 @@ else
 
                                   #if we don't have any friends aww, just blow everything away
                                   nofriends = (callback) ->
+
                                     if friends.length is 0
-                                      deleteRemainingIdentityData multi, username, callback
+                                      #if we deleted someone but they haven't deleted us yet
+                                      #this set will be populated
+                                      rc.scard "od:#{username}", (err, card) ->
+                                        if card is 0
+                                          deleteRemainingIdentityData multi, username, callback
+                                        else
+                                          callback()
                                     else
                                       callback()
 
@@ -2922,6 +2950,7 @@ else
     multi.del "u:#{username}"
     multi.del "ud:#{username}"
     multi.del "c:#{username}"
+    multi.del "od:#{username}"
     multi.hdel "ucmcounters", username
     multi.srem "d", username
 
@@ -2943,9 +2972,9 @@ else
         #delete the conversation with this user from the set of my conversations
         multi.srem "c:#{username}", room
 
-
         cdb.getFriendData username, theirUsername, (err, friend) ->
           logger.error "error getting friend data #{err}" if err?
+
           if friend.imageUrl?
             deleteFile friend.imageUrl, "image/"
 
@@ -2981,18 +3010,21 @@ else
                 multi.srem "f:#{username}", theirUsername
                 multi.srem "f:#{theirUsername}", username
 
-                #add me to their set of deleted users if they're not deleted
                 rc.sismember "d", theirUsername, (err, isDeleted) ->
                   return next err if err?
                   if not isDeleted
+                    #add them to my deleted users set
+                    multi.sadd "od:#{username}", theirUsername
+                    #add me to their set of deleted users if they're not deleted
                     multi.sadd "ud:#{theirUsername}", username
                   next()
 
           #they've already deleted me
           else
-            #remove them from their deleted set (if they deleted their identity) (don't use multi so we can check card post removal later)
+            #remove me from their deleted set (if they deleted their identity) (don't use multi so we can check card post removal later)
             rc.srem "d:#{theirUsername}", username, (err, rCount) ->
               return next err if err?
+
               #if they have been deleted and we are the last person to delete them
               #remove the final pieces of data
               rc.sismember "d", theirUsername, (err, isDeleted) ->
@@ -3037,6 +3069,9 @@ else
 
                       #remove them from my deleted set
                       multi.srem "ud:#{username}", theirUsername
+
+                      #remove me from their deleted set
+                      multi.srem "od:#{theirUsername}", username
 
                       cdb.deleteAllMessages room, (err, results) ->
                         logger.error "Could not delete spot #{room} messages" if err?
@@ -3101,9 +3136,15 @@ else
     return done(null, 403) if signature?.length < 16
     userKey = "u:" + username
     logger.debug "validating: " + username
-    rcs.hgetall userKey, (err, user) ->
+
+    multi = rc.multi()
+    multi.sismember "u", username
+    multi.hgetall userKey
+    multi.exec (err, results) ->
       return done(err) if err?
-      return done null, 404 unless user?.password
+      return done null, 404 unless results[0]
+      user = results[1]
+      return done null, 404 unless user?.password?
       comparePassword password, user.password, (err, res) ->
         return done err if err?
         return done null, 403 unless res
