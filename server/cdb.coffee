@@ -425,7 +425,7 @@ exports.insertUserControlMessage = (username, message, callback) ->
     insert += ", moredata) "
     values += ", ?);"
     #store moredata object as json string in case of friend image data
-    if message.action is 'friendImage' or message.action is 'friendAlias'
+    if message.action is 'friendImage' or message.action is 'friendAlias' and message.moredata?
       message.moredata = JSON.stringify(message.moredata)
 
     params.push message.moredata
@@ -454,7 +454,7 @@ exports.remapUserControlMessages = (results, reverse, asArrayOfJsonStrings) ->
 
 
     #parse json if it's friendImage
-    if message.action is 'friendImage' or message.action is 'friendAlias'
+    if (message.action is 'friendImage' or message.action is 'friendAlias') and message.moredata?
       message.moredata = JSON.parse(message.moredata)
 
     #insert at begining to reverse order
@@ -636,6 +636,46 @@ exports.insertFriendAliasData = (username, friendname, data, version, iv, callba
       callback(err,results)
   else
     callback()
+
+
+exports.deleteFriendAliasData = (username, friendname, callback) ->
+
+  if username? and friendname?
+    cql =
+      "DELETE aliasdata, aliasversion, aliasiv FROM frienddata WHERE username = ? AND friendname = ?;"
+
+    #logger.debug "sending cql #{cql}"
+
+    pool.cql cql, [
+      username,
+      friendname
+    ], (err, results) ->
+      if err?
+        logger.error "error deleting friend alias data for username: #{username}, friendname: #{friendname}: #{err}"
+      callback(err,results)
+  else
+    callback()
+
+
+exports.deleteFriendImageData = (username, friendname, callback) ->
+
+  if username? and friendname?
+    cql =
+      "DELETE imageurl, imageversion, imageiv FROM frienddata WHERE username = ? AND friendname = ?;"
+
+    #logger.debug "sending cql #{cql}"
+
+    pool.cql cql, [
+      username,
+      friendname
+    ], (err, results) ->
+      if err?
+        logger.error "error deleting friend image data for username: #{username}, friendname: #{friendname}: #{err}"
+      callback(err,results)
+  else
+    callback()
+
+
 
 exports.remapFriendData = (row) ->
   friend = new common.Friend null, 0

@@ -1455,10 +1455,33 @@ else
       return next err if err?
       createAndSendUserControlMessage username, "friendAlias", friendname, { data: data, iv: iv, version: version }, (err) ->
         if err?
-          logger.error "/users/#{username}/alias/#{version}, error creating and sending user control message: #{err}"
+          logger.error "#{username} /users/#{friendname}/alias/#{version}, error creating and sending user control message: #{err}"
         res.send 204
 
 
+
+  app.delete "/users/:username/alias", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
+    username = req.user.username
+    friendname = req.params.username
+
+    cdb.deleteFriendAliasData username, friendname, (err, results) ->
+      return next err if err?
+      createAndSendUserControlMessage username, "friendAlias", friendname, null, (err) ->
+        if err?
+          logger.error "delete #{username} /users/#{friendname}/alias, error creating and sending user control message: #{err}"
+        res.send 204
+
+
+  app.delete "/users/:username/image", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
+    username = req.user.username
+    friendname = req.params.username
+
+    cdb.deleteFriendImageData username, friendname, (err, results) ->
+      return next err if err?
+      createAndSendUserControlMessage username, "friendImage", friendname, null, (err) ->
+        if err?
+          logger.error "delete #{username} /users/#{friendname}/alias, error creating and sending user control message: #{err}"
+        res.send 204
 
   app.post "/images/:username/:version", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
 
