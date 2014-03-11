@@ -47,7 +47,8 @@ cleanup = (done) ->
     "kv:test1",
     "k:test1",
     "kv:test2",
-    "k:test2"]
+    "k:test2",
+    "d:test2"]
   multi = rc.multi()
 
   multi.del keys
@@ -66,9 +67,11 @@ cleanup = (done) ->
                delete from chatmessages where username = ?
                delete from usercontrolmessages where username = ?
                delete from usercontrolmessages where username = ?
-               apply batch"
+               delete from frienddata where username = ?
+               delete from frienddata where username = ?
+                 apply batch"
 
-      pool.cql cql, ["test0", "test1", "test0", "test1"], (err, results) ->
+      pool.cql cql, ["test0", "test1", "test0", "test1", "test0", "test1"], (err, results) ->
         if err
           done err
         else
