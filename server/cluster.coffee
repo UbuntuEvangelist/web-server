@@ -2110,17 +2110,23 @@ else
     version = req.body.version
     platform = req.body.platform
 
-    return res.send 409 unless validator.isAlphanumeric req.body.username
+    #older versions won't have platform set so limit them to alpha
+    isAlpha = validator.isAlphanumeric req.body.username
+    return res.send 403 if platform isnt 'ios' and platform isnt 'android' and not isAlpha
+
     #ios version 1 can't save identities with extended chars properly
-#    isAlpha = validator.isAlphanumeric req.body.username
-#    if platform is 'ios'
-#      #tell them to upgrade unless all chars are alpha or we're not on v1.1
-#      return res.send 403 unless isAlpha or version isnt "1:1"
-#
-#    #android < 49 doesn't handle some chars in auto invite links
-#    if platform is 'android'
-#      return res.send 403 unless isAlpha or version isnt "49"
-#
+    if platform is 'ios'
+      #tell them to upgrade unless all chars are alpha or we're not on v1.1
+      return res.send 403 unless isAlpha or version isnt "1:1"
+
+    #android < 49 doesn't handle some chars in auto invite links
+    if platform is 'android'
+      intVersion = parseInt version
+      if isNaN intVersion
+        return res.send 403 unless isAlpha
+      else
+        return res.send 403 if intVersion < 49
+
     userExistsOrDeleted username, true, (err, exists) ->
       return next err if err?
       if exists
@@ -2195,14 +2201,7 @@ else
                     else
                       next()
 
-  checkUsername = (req, res, next) ->
-    logger.debug "checking #{req.params.username}"
-    #don't let them create anything but alpha numeric english usernames till we fix it on ios
-    return res.send true unless validator.isAlphanumeric req.params.username
-    next()
-
-  #remove checkUsername once v2 propagated
-  app.get "/users/:username/exists", setNoCache, checkUsername, (req, res, next) ->
+  app.get "/users/:username/exists", setNoCache, (req, res, next) ->
     logger.debug "/users/#{req.params.username}/exists"
     userExistsOrDeleted req.params.username, true, (err, exists) ->
       return next err if err?
