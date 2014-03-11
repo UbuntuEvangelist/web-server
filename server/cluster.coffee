@@ -2998,7 +2998,7 @@ else
         cdb.getFriendData username, theirUsername, (err, friend) ->
           logger.error "error getting friend data #{err}" if err?
 
-          if friend.imageUrl?
+          if friend?.imageUrl?
             deleteFile friend.imageUrl, "image/"
 
           cdb.deleteFriendData username, theirUsername, (err, results) ->
