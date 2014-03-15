@@ -52,7 +52,7 @@ terms of a separate license:
 
 * [redback](https://github.com/chriso/redback) - Copyright (c) 2010 Chris O'Hara cohara87@gmail.com
 * [request](https://github.com/mikeal/request) - Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
-* [mkdirp](https://github/com/substack/node-mkdirp) - Copyright 2010 James Halliday <mail@substack.net>
+* [mkdirp](https://github.com/substack/node-mkdirp) - Copyright 2010 James Halliday <mail@substack.net>
 * [pkgcloud](https://github.com/nodejitsu/pkgcloud) - Copyright 2011 Nodejitsu Inc.
 * [nodemailer](https://github.com/andris9) - Copyright 2011-2012 Andris Reinman
 * [async](https://github.com/caolan/async) - Copyright 2010 Caolan McMahon
