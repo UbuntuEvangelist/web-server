@@ -102,6 +102,8 @@ login = (username, password, jar, authSig, referrers, done, callback) ->
       password: password
       authSig: authSig
       referrers: referrers
+      version: 56
+      platform:'android'
     (err, res, body) ->
       if err
         done err
@@ -120,6 +122,8 @@ signup = (username, password, jar, dhPub, dsaPub, authSig, referrers, done, call
       dsaPub: dsaPub
       authSig: authSig
       referrers: referrers
+      version: 56
+      platform:'android'
     (err, res, body) ->
       if err
         done err
