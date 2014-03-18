@@ -373,6 +373,7 @@ else
       next()
     else
       logger.debug "401"
+      req.session?.destroy()
       res.send 401
 
   setNoCache = (req, res, next) ->
@@ -3104,6 +3105,7 @@ else
   app.post "/logout", ensureAuthenticated, (req, res) ->
     logger.info "#{req.user.username} logged out"
     req.logout()
+    req.session?.destroy()
     res.send 204
 
 
