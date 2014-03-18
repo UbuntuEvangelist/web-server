@@ -2111,20 +2111,20 @@ else
     version = req.body.version
     platform = req.body.platform
 
-    #older versions won't have platform set so limit them to alpha
-    isAlpha = validator.isAlphanumeric req.body.username
-    return res.send 403 if platform isnt 'ios' and platform isnt 'android' and not isAlpha
+    #older versions won't have platform set so tell them to upgrade
+    return res.send 403 if platform isnt 'ios' and platform isnt 'android'
 
     #ios version 1 can't save identities with extended chars properly
     if platform is 'ios'
-      #tell them to upgrade unless all chars are alpha or we're not on v1.1
-      return res.send 403 unless isAlpha or version isnt "1:1"
+      #tell them to upgrade
+      return res.send 403 unless version is "2:2"
 
     #android < 49 doesn't handle some chars in auto invite links
+    #tell them to upgrade if < 49
     if platform is 'android'
       intVersion = parseInt version
       if isNaN intVersion
-        return res.send 403 unless isAlpha
+        return res.send 403
       else
         return res.send 403 if intVersion < 49
 
