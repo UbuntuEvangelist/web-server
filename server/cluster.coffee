@@ -357,7 +357,7 @@ else
           accept null, false
         else
           req.session = session
-          if req.session.passport.user
+          if req.session.passport?.user?
             accept null, true
           else
             accept null, false
@@ -459,7 +459,7 @@ else
   validateAreFriends = (req, res, next) ->
     #pause and resume events - https://github.com/felixge/node-formidable/issues/213
     paused = pause req
-    username = req.user.username
+    username = req.user
     friendname = req.params.username
     isFriend username, friendname, (err, result) ->
       if err?
@@ -476,7 +476,7 @@ else
 
 
   validateAreFriendsOrDeleted = (req, res, next) ->
-    username = req.user.username
+    username = req.user
     friendname = req.params.username
     isFriend username, friendname, (err, result) ->
       return next err if err?
@@ -492,7 +492,7 @@ else
             res.send 403
 
   validateAreFriendsOrDeletedOrMe = (req, res, next) ->
-    username = req.user.username
+    username = req.user
     friendname = req.params.username
     return next() if username is friendname
     isFriend username, friendname, (err, result) ->
@@ -510,7 +510,7 @@ else
 
 
   validateAreFriendsOrDeletedOrInvited = (req, res, next) ->
-    username = req.user.username
+    username = req.user
     friendname = req.params.username
 
     isFriend username, friendname, (err, result) ->
@@ -736,7 +736,7 @@ else
 
 
   updatePurchaseTokensMiddleware = (validate) -> (req, res, next) ->
-    logger.debug "user #{req.user.username} received purchaseTokens #{req.body.purchaseTokens}, receipt: " + if req.body.purchaseReceipt? then "yes" else "no"
+    logger.debug "user #{req.user} received purchaseTokens #{req.body.purchaseTokens}, receipt: " + if req.body.purchaseReceipt? then "yes" else "no"
 
     purchaseTokens = req.body.purchaseTokens
     purchaseReceipt = req.body.purchaseReceipt
@@ -746,10 +746,10 @@ else
         purchaseTokens = JSON.parse purchaseTokens
       catch error
 
-      updatePurchaseTokens(req.user.username, purchaseTokens, validate)
+      updatePurchaseTokens(req.user, purchaseTokens, validate)
 
     if purchaseReceipt
-      validateVoiceReceipt(req.user.username, purchaseReceipt)
+      validateVoiceReceipt(req.user, purchaseReceipt)
 
     next()
 
@@ -1245,7 +1245,7 @@ else
   #delete all messages
   app.delete "/messagesutai/:username/:id", ensureAuthenticated, validateUsernameExistsOrDeleted, validateAreFriendsOrDeleted, (req, res, next) ->
 
-    username = req.user.username
+    username = req.user
     otherUser = req.params.username
     room = common.getSpotName username, otherUser
     id = parseInt req.params.id, 10
@@ -1375,7 +1375,7 @@ else
     messageId = parseInt req.params.id, 10
     return next new Error 'id required' unless messageId? and not Number.isNaN(messageId)
 
-    username = req.user.username
+    username = req.user
     otherUser = req.params.username
     
     spot = common.getSpotName username, otherUser
@@ -1429,7 +1429,7 @@ else
     shareable = req.body.shareable
     return next new Error 'shareable required' unless shareable?
 
-    username = req.user.username
+    username = req.user
     otherUser = req.params.username
     spot = common.getSpotName username, otherUser
     bShareable = shareable is 'true'
@@ -1443,7 +1443,7 @@ else
 
   app.put "/users/:username/alias", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
 
-    username = req.user.username
+    username = req.user
     friendname = req.params.username
     version = req.body.version
     return res.send 400 unless version?
@@ -1462,7 +1462,7 @@ else
 
 
   app.delete "/users/:username/alias", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
-    username = req.user.username
+    username = req.user
     friendname = req.params.username
 
     cdb.deleteFriendAliasData username, friendname, (err, results) ->
@@ -1474,7 +1474,7 @@ else
 
 
   app.delete "/users/:username/image", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
-    username = req.user.username
+    username = req.user
     friendname = req.params.username
 
     cdb.deleteFriendImageData username, friendname, (err, results) ->
@@ -1486,7 +1486,7 @@ else
 
   app.post "/images/:username/:version", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
 
-    username = req.user.username
+    username = req.user
     otherUser = req.params.username
     version = req.params.version
     return res.send 400 unless version?
@@ -1555,7 +1555,7 @@ else
   #doing more than images now, don't feel like changing the api though..yet
   app.post "/images/:fromversion/:username/:toversion", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
     #upload image to rackspace then create a message with the image url and send it to chat recipients
-    username = req.user.username
+    username = req.user
     path = null
     size = 0
     container = null
@@ -1648,7 +1648,7 @@ else
               url = cdn + "/#{path}"
 
               time = Date.now()
-              createAndSendMessage req.user.username, req.params.fromversion, req.params.username, req.params.toversion, part.filename, url, mimeType, id, size, time, null, (err) ->
+              createAndSendMessage req.user, req.params.fromversion, req.params.username, req.params.toversion, part.filename, url, mimeType, id, size, time, null, (err) ->
                 logger.error "error sending message on socket: #{err}" if err?
                 return next err if err?
                 res.send { id: id, url: url, time: time, size: size}
@@ -1695,7 +1695,7 @@ else
   app.post "/optdata/:userControlId", ensureAuthenticated, updatePurchaseTokensMiddleware(false), setNoCache, (req, res, next) ->
     #need array of {un: username, mid: , cmid: }
 
-    username = req.user.username
+    username = req.user
     userControlId = parseInt req.params.userControlId, 10
     return next new Error 'no userControlId' unless userControlId? and not Number.isNaN(userControlId)
 
@@ -1713,7 +1713,7 @@ else
         logger.debug "got new user control messages: #{userControlMessages}"
         data.userControlMessages = userControlMessages
 
-      getConversationIds req.user.username, (err, conversationIds) ->
+      getConversationIds req.user, (err, conversationIds) ->
         return next err if err?
 
         return res.send data unless conversationIds?
@@ -1778,7 +1778,7 @@ else
   app.post "/latestdata/:userControlId", ensureAuthenticated, setNoCache, (req, res, next) ->
     #need array of {un: username, mid: , cmid: }
 
-    username = req.user.username
+    username = req.user
     userControlId = parseInt req.params.userControlId, 10
     return next new Error 'no userControlId' unless userControlId? and not Number.isNaN(userControlId)
 
@@ -1796,7 +1796,7 @@ else
         logger.debug "got new user control messages: #{userControlMessages}"
         data.userControlMessages = userControlMessages
 
-      getConversationIds req.user.username, (err, conversationIds) ->
+      getConversationIds req.user, (err, conversationIds) ->
         return next err if err?
 
         return res.send data unless conversationIds?
@@ -1860,10 +1860,10 @@ else
 
   app.get "/latestids/:userControlId", ensureAuthenticated, setNoCache, (req, res, next) ->
     userControlId = parseInt req.params.userControlId, 10
-    logger.debug "#{req.user.username} /latestids/#{userControlId}"
+    logger.debug "#{req.user} /latestids/#{userControlId}"
     return next new Error 'no userControlId' unless userControlId? and not Number.isNaN(userControlId)
 
-    getLatestUserControlMessages req.user.username, userControlId, true, (err, userControlMessages) ->
+    getLatestUserControlMessages req.user, userControlId, true, (err, userControlMessages) ->
       return next err if err?
 
       data =  {}
@@ -1871,7 +1871,7 @@ else
         #logger.debug "got new user control messages: #{userControlMessages}"
         data.userControlMessages = userControlMessages
 
-      getConversationIds req.user.username, (err, conversationIds) ->
+      getConversationIds req.user, (err, conversationIds) ->
         return next err if err?
 
         return res.send data unless conversationIds?
@@ -1909,7 +1909,7 @@ else
     id = parseInt req.params.messageid, 10
     return res.send 400 unless id? and not Number.isNaN(id)
 
-    cdb.getMessagesBeforeId req.user.username, common.getSpotName(req.user.username, req.params.username), id, true, (err, data) ->
+    cdb.getMessagesBeforeId req.user, common.getSpotName(req.user, req.params.username), id, true, (err, data) ->
       return next err if err?
       #sData = JSON.stringify(data)
 
@@ -1923,7 +1923,7 @@ else
     id = parseInt req.params.messageid, 10
     return res.send 400 unless id? and not Number.isNaN(id)
 
-    cdb.getMessagesBeforeId req.user.username, common.getSpotName(req.user.username, req.params.username), id, false, (err, data) ->
+    cdb.getMessagesBeforeId req.user, common.getSpotName(req.user, req.params.username), id, false, (err, data) ->
       return next err if err?
       #sData = JSON.stringify(data)
 
@@ -1940,13 +1940,13 @@ else
     return next new Error 'control message id required' unless messageControlId? and not Number.isNaN(messageControlId)
 
     #get latest ids
-    spot = common.getSpotName req.user.username, req.params.username
+    spot = common.getSpotName req.user, req.params.username
     multi = rc.multi()
     multi.hget "mcounters", spot
     multi.hget "mcmcounters", spot
     multi.exec (err, results) ->
       return next err if err?
-      getMessagesAndControlMessagesOpt req.user.username, req.params.username, messageId, results[0], messageControlId, results[1], false, (err, data) ->
+      getMessagesAndControlMessagesOpt req.user, req.params.username, messageId, results[0], messageControlId, results[1], false, (err, data) ->
         return next err if err?
         if data?
           sData = JSON.stringify(data)
@@ -1954,7 +1954,7 @@ else
           res.set {'Content-Type': 'application/json'}
           res.send data
         else
-          logger.debug "no new messages for user #{req.user.username} for friend #{req.params.username}"
+          logger.debug "no new messages for user #{req.user} for friend #{req.params.username}"
           res.send 204
 
   app.get "/messagedata/:username/:messageid/:controlmessageid", ensureAuthenticated, validateUsernameExistsOrDeleted, validateAreFriendsOrDeleted, setNoCache, (req, res, next) ->
@@ -1966,13 +1966,13 @@ else
     return next new Error 'control message id required' unless messageControlId? and not Number.isNaN(messageControlId)
 
     #get latest ids
-    spot = common.getSpotName req.user.username, req.params.username
+    spot = common.getSpotName req.user, req.params.username
     multi = rc.multi()
     multi.hget "mcounters", spot
     multi.hget "mcmcounters", spot
     multi.exec (err, results) ->
       return next err if err?
-      getMessagesAndControlMessagesOpt req.user.username, req.params.username, messageId, results[0], messageControlId, results[1], true, (err, data) ->
+      getMessagesAndControlMessagesOpt req.user, req.params.username, messageId, results[0], messageControlId, results[1], true, (err, data) ->
         return next err if err?
         if data?
           sData = JSON.stringify(data)
@@ -1980,7 +1980,7 @@ else
           res.set {'Content-Type': 'application/json'}
           res.send sData
         else
-          logger.debug "no new messages for user #{req.user.username} for friend #{req.params.username}"
+          logger.debug "no new messages for user #{req.user} for friend #{req.params.username}"
           res.send 204
 
 
@@ -2194,8 +2194,8 @@ else
                 multi.exec (err,replies) ->
                   return next err if err?
                   logger.warn "#{username} created, uid: #{user.id}, platform: #{platform}, version: #{version}"
-                  req.login user, ->
-                    req.user = user
+                  req.login username, ->
+                    req.user = username
 
                     if referrers
                       handleReferrers username, referrers, next
@@ -2229,7 +2229,7 @@ else
 
     return next() unless gcmId? or apnToken?
 
-    username = req.user.username
+    username = req.user
 
     userKey = "u:" + username
     rcs.hgetall userKey, (err, user) ->
@@ -2300,7 +2300,7 @@ else
 
   #end unauth'd methods
   app.post "/login", passport.authenticate("local"), validateVersion, updatePushIds, updatePurchaseTokensMiddleware(true), (req, res, next) ->
-    username = req.user.username
+    username = req.user
     logger.debug "/login post, user #{username}"
 
     res.send 204
@@ -2436,7 +2436,7 @@ else
     password = req.body.password
     authSig = req.body.authSig
 
-    validateUser username, password, authSig, (err, status, user) ->
+    validateUser username, password, authSig, (err, status) ->
       return next err if err?
       res.send status
 
@@ -2529,7 +2529,7 @@ else
 
   handleInvite = (req,res,next) ->
     friendname = req.params.username
-    username = req.user.username
+    username = req.user
     source = req.params.source ? "manual"
 
     # the caller wants to add himself as a friend
@@ -2660,7 +2660,7 @@ else
     return next new Error 'action required' unless req.params.action?
 
 
-    username = req.user.username
+    username = req.user
     friendname = req.params.username
     action = req.params.action
 
@@ -2699,7 +2699,7 @@ else
           else return next new Error 'invalid action'
 
   getFriends = (req, res, next) ->
-    username = req.user.username
+    username = req.user
     #get users we're friends with
     rc.smembers "f:#{username}", (err, rfriends) ->
       return next err if err?
@@ -2946,7 +2946,7 @@ else
 
 
   app.delete "/friends/:username", ensureAuthenticated, validateUsernameExistsOrDeleted, validateAreFriendsOrDeletedOrInvited, (req, res, next) ->
-    username = req.user.username
+    username = req.user
     theirUsername = req.params.username
 
     multi = rc.multi()
@@ -3103,7 +3103,7 @@ else
 
 
   app.post "/logout", ensureAuthenticated, (req, res) ->
-    logger.info "#{req.user.username} logged out"
+    logger.info "#{req.user} logged out"
     req.logout()
     req.session?.destroy()
     res.send 204
@@ -3182,29 +3182,29 @@ else
           logger.debug "validated, #{username}: #{verified}"
 
           status = if verified then 204 else 403
-          done null, status, if verified then user else null
+          done null, status, if verified then user.username else null
 
 
   passport.use new LocalStrategy ({passReqToCallback: true}), (req, username, password, done) ->
     #logger.debug "client ip: #{req.connection.remoteAddress}"
     signature = req.body.authSig
-    validateUser username, password, signature, (err, status, user) ->
+    validateUser username, password, signature, (err, status, vusername) ->
       return done(err) if err?
 
       switch status
         when 404 then return done null, false, message: "unknown user"
         when 403 then return done null, false, message: "invalid password or key"
-        when 204 then return done null, user
+        when 204 then return done null, vusername
         else
           return new Error "unknown validation status: #{status}"
 
-  passport.serializeUser (user, done) ->
-    logger.debug "serializeUser, username: " + user.username
-    done null, user.username
+  passport.serializeUser (username, done) ->
+    logger.debug "serializeUser, username: " + username
+    done null, username
 
   passport.deserializeUser (username, done) ->
     logger.debug "deserializeUser, user:" + username
-    rcs.hgetall "u:" + username, (err, user) ->
+    rcs.hget "u:" + username, "username", (err, user) ->
       done err, user
 
 
