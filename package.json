@@ -39,8 +39,7 @@
     "express-bunyan-logger": "0.0.2",
     "jade": "~1.0.0",
     "iap_verifier": "https://github.com/surespot/iap_verifier/tarball/master",
-    "helenus": "https://github.com/surespot/helenus/tarball/master",
-    "validator": "~3.3.0"
+    "helenus": "https://github.com/surespot/helenus/tarball/master"
   },
   "subdomain": "2fours.com",
   "scripts": {
