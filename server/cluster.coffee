@@ -304,17 +304,6 @@ else
     app.use express.cookieParser()
     app.use express.json()
     app.use express.urlencoded()
-
-    app.use express.session(
-      secret: sessionSecret
-      store: sessionStore
-      #set cookie expiration in ms
-      cookie: { maxAge: (oneDay*3000) }
-      proxy: true
-    )
-    app.use passport.initialize()
-    app.use passport.session({pauseStream: true})
-
     app.set 'views', "#{__dirname}/views"
     app.set 'view engine', 'jade'
 
@@ -365,15 +354,46 @@ else
 
   typeIsArray = Array.isArray || ( value ) -> return {}.toString.call( value ) is '[object Array]'
 
+  initSession = (req,res,next) ->
+    mids = []
+    mids.push express.session(
+      secret: sessionSecret
+      store: sessionStore
+    #set cookie expiration in ms
+      cookie: { maxAge: (oneDay*3000) }
+      proxy: true
+    )
+    mids.push passport.initialize()
+    mids.push passport.session({pauseStream: true})
+
+    common.combineMiddleware(mids)(req,res,next)
+
+
+
   ensureAuthenticated = (req, res, next) ->
-    logger.debug "ensureAuth"
-    if req.isAuthenticated()
-      logger.debug "authorized"
-      next()
-    else
-      logger.debug "401"
-      req.session?.destroy()
-      res.send 401
+    mids = []
+    mids.push express.session(
+      secret: sessionSecret
+      store: sessionStore
+    #set cookie expiration in ms
+      cookie: { maxAge: (oneDay*3000) }
+      proxy: true
+    )
+    mids.push passport.initialize()
+    mids.push passport.session({pauseStream: true})
+    mids.push (req, res, next) ->
+      logger.debug "ensureAuth"
+      if req.isAuthenticated()
+        logger.debug "authorized"
+        next()
+      else
+        logger.debug "401"
+        req.session?.destroy()
+        res.send 401
+
+    common.combineMiddleware(mids)(req,res,next)
+
+
 
   setNoCache = (req, res, next) ->
     res.setHeader "Cache-Control", "no-cache"
@@ -2193,13 +2213,18 @@ else
                 multi.exec (err,replies) ->
                   return next err if err?
                   logger.warn "#{username} created, uid: #{user.id}, platform: #{platform}, version: #{version}"
-                  req.login username, ->
-                    req.user = username
 
-                    if referrers
-                      handleReferrers username, referrers, next
-                    else
-                      next()
+                  #now we have a user we can create a session
+                  initSession req, res, (err) ->
+                    if err?
+                      req.session?.destroy()
+                      return next(err)
+
+                    req.login username, ->
+                      if referrers
+                        handleReferrers username, referrers, next
+                      else
+                        next()
 
   app.get "/users/:username/exists", setNoCache, (req, res, next) ->
     logger.debug "/users/#{req.params.username}/exists"
@@ -2298,7 +2323,7 @@ else
 
 
   #end unauth'd methods
-  app.post "/login", passport.authenticate("local"), validateVersion, updatePushIds, updatePurchaseTokensMiddleware(true), (req, res, next) ->
+  app.post "/login", initSession, passport.authenticate("local"), validateVersion, updatePushIds, updatePurchaseTokensMiddleware(true), (req, res, next) ->
     username = req.user
     logger.debug "/login post, user #{username}"
 
@@ -2431,6 +2456,9 @@ else
 
 
   app.post "/validate", (req, res, next) ->
+    return res.send 400 unless req.body?.username?
+    return res.send 400 unless req.body?.password?
+    return res.send 400 unless req.body?.authSig?
     username = req.body.username
     password = req.body.password
     authSig = req.body.authSig
@@ -3188,13 +3216,20 @@ else
     #logger.debug "client ip: #{req.connection.remoteAddress}"
     signature = req.body.authSig
     validateUser username, password, signature, (err, status, vusername) ->
-      return done(err) if err?
+      if err?
+        req.session?.destroy()
+        return done(err)
 
       switch status
-        when 404 then return done null, false, message: "unknown user"
-        when 403 then return done null, false, message: "invalid password or key"
+        when 404
+          req.session?.destroy()
+          return done null, false, message: "unknown user"
+        when 403
+          req.session?.destroy()
+          return done null, false, message: "invalid password or key"
         when 204 then return done null, vusername
         else
+          req.session?.destroy()
           return new Error "unknown validation status: #{status}"
 
   passport.serializeUser (username, done) ->

@@ -32,3 +32,14 @@ exports.Friend = (name, flags, imageUrl, imageVersion, imageIv, aliasData, alias
     friend.aliasIv = aliasIv
 
   return friend
+
+exports.combineMiddleware = (list) ->
+  (req, res, next) ->
+    (iter = (i) ->
+      mid = list[i]
+      return next() unless mid
+      mid req, res, (err) ->
+        return next(err) if err
+        iter i + 1
+    )(0)
+
