@@ -865,7 +865,6 @@ else
       else
         callback newId
 
-
   MessageError = (id, status) ->
     messageError = {}
     messageError.id = id
@@ -934,6 +933,13 @@ else
               when "audio/mp4"
                 multi.hincrby "u:#{from}", "vc", 1
                 multi.incr "tvc"
+
+            #if to user not connected, increment activity count
+            roomCount = sio.sockets.clients(to).length
+            logger.info "room clients for #{to}, #{roomCount}"
+            if roomCount is 0
+              #increment new message count
+              multi.hincrby "u:#{to}", "ac", 1
 
             multi.exec  (err, results) ->
               if err?
@@ -1007,7 +1013,7 @@ else
   sendPushMessage = (message, messagejson) ->
     #send gcm message
     userKey = "u:" + message.to
-    rc.hmget userKey, ["gcmId", "apnToken"], (err, ids) ->
+    rc.hmget userKey, ["gcmId", "apnToken", "ac"], (err, ids) ->
       if err?
         logger.error "error getting push ids for user: #{message.to}, error: #{err}"
         return
@@ -1054,7 +1060,11 @@ else
             apnDevice = new apn.Device token
             note = new apn.Notification()
             #apns are only 256 chars so we can't send the message
-            #note.badge = 1
+
+            badgeNum = parseInt ids[2]
+            badgeNum = if isNaN(badgeNum) then 0 else badgeNum
+
+            note.badge = badgeNum
             note.alert = { "loc-key": "notification_message", "loc-args": [message.to, message.from] }
             note.payload = { id:message.id }
             note.sound = "message.caf"
@@ -1788,10 +1798,13 @@ else
                   callback()
 
               addNewMessages ->
-                sData = JSON.stringify(data)
-                logger.debug "/optdata sending #{sData}"
-                res.set {'Content-Type': 'application/json'}
-                res.send data)
+                #clear new message counter
+                rc.hset "u:#{username}", "ac", 0, (err, result) ->
+                  return next(err) if err?
+                  sData = JSON.stringify(data)
+                  logger.debug "/optdata sending #{sData}"
+                  res.set {'Content-Type': 'application/json'}
+                  res.send data)
 
   #get all the data we need in one call
   app.post "/latestdata/:userControlId", ensureAuthenticated, setNoCache, (req, res, next) ->
@@ -2485,6 +2498,13 @@ else
     multi.srem "b:#{username}", friendname
     multi.sadd "is:#{username}", friendname
     multi.sadd "ir:#{friendname}", username
+    #add one to activity count if user not connected
+    roomCount = sio.sockets.clients(friendname).length
+    logger.info "room clients for #{friendname}, #{roomCount}"
+    if roomCount is 0
+      #increment new message count
+      multi.hincrby "u:#{friendname}", "ac", 1
+
     multi.exec (err, results) ->
       return callback err if err?
       invitesCount = results[2]
@@ -2504,7 +2524,7 @@ else
   sendPushInvite = (username, friendname) ->
     userKey = "u:" + friendname
 
-    rc.hmget userKey, ["gcmId", "apnToken"], (err, ids) ->
+    rc.hmget userKey, ["gcmId", "apnToken", "ac"], (err, ids) ->
       if err?
         logger.error "inviteUser, " + err
         return
@@ -2541,7 +2561,11 @@ else
           (token, callback) ->
             apnDevice = new apn.Device token
             note = new apn.Notification()
-            #note.badge = 1
+
+            badgeNum = parseInt ids[2]
+            badgeNum = if isNaN(badgeNum) then 0 else badgeNum
+
+            note.badge = badgeNum
             note.sound = "surespot-invite.caf"
             note.alert = { "loc-key": "notification_invite", "loc-args": [friendname, username] }
             apnConnection.pushNotification note, apnDevice
@@ -2632,7 +2656,7 @@ else
   sendPushInviteAccept = (username, friendname) ->
     userKey = "u:" + friendname
 
-    rc.hmget userKey, ["gcmId", "apnToken"], (err, ids) ->
+    rc.hmget userKey, ["gcmId", "apnToken", "ac"], (err, ids) ->
       if err?
         logger.error "sendPushInviteAccept, #{err}"
         return
@@ -2670,7 +2694,11 @@ else
           (token, callback) ->
             apnDevice = new apn.Device token
             note = new apn.Notification()
-            #note.badge = 1
+
+            badgeNum = parseInt ids[2]
+            badgeNum = if isNaN(badgeNum) then 0 else badgeNum
+
+            note.badge = badgeNum
             note.sound = "invite-accept.caf"
             note.alert = { "loc-key": "notification_invite_accept", "loc-args": [friendname, username] }
             apnConnection.pushNotification note, apnDevice
@@ -2704,8 +2732,17 @@ else
           when 'accept'
             createFriendShip username, friendname, (err) ->
               return next err if err?
+
               process.nextTick ->
-                sendPushInviteAccept(username, friendname)
+                #increment activity counter if not currently connected
+                roomCount = sio.sockets.clients(friendname).length
+                logger.info "room clients for #{friendname}, #{roomCount}"
+                if roomCount is 0
+                  #increment new message count
+                  rc.hincrby "u:#{friendname}", "ac", 1, (err, result) ->
+                    sendPushInviteAccept(username, friendname)
+                else
+                    sendPushInviteAccept(username, friendname)
               res.send 204
           when 'ignore'
             createAndSendUserControlMessage friendname, 'ignore', username, null, (err) ->
