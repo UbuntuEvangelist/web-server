@@ -2153,8 +2153,13 @@ else
 
     #ios version 1 can't save identities with extended chars properly
     if platform is 'ios'
+      versions = version?.split ":"
       #tell them to upgrade
-      return res.send 403 unless version is "2:2" or version is "3:3" or version is "4:4"
+      intVersion = parseInt versions?[0]
+      if isNaN intVersion
+        return res.send 403
+      else
+        return res.send 403 if intVersion < 2
 
     #android < 49 doesn't handle some chars in auto invite links
     #tell them to upgrade if < 49
