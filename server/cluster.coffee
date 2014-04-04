@@ -1718,11 +1718,22 @@ else
     userControlId = parseInt req.params.userControlId, 10
     return next new Error 'no userControlId' unless userControlId? and not Number.isNaN(userControlId)
 
-    spotIds = null
-    try
-      logger.debug "optdata, spotIds: #{req.body.spotIds}"
-      spotIds = JSON.parse req.body.spotIds
-    catch error
+    logger.debug "optdata, userControlId: #{userControlId}, spotIds: #{req.body.spotIds}"
+
+    spotIds = {}
+    if req.body?.spotIds?
+      try
+
+        spotIdsJson = JSON.parse req.body.spotIds
+        for spotItem in spotIdsJson
+          spotIdData = {}
+          spot = common.getSpotName username, spotItem.u
+          spotIdData.cm = parseInt(spotItem.cm, 10)
+          spotIdData.m = parseInt(spotItem.m, 10)
+          spotIdData.u = spotItem.u
+          spotIds[spot] = spotIdData
+
+      catch error
 
     getLatestUserControlMessages username, userControlId, false, (err, userControlMessages) ->
       return next err if err?
@@ -1755,27 +1766,28 @@ else
               _.each(
                 rControlIds
                 (controlId, i) ->
-                  if controlId isnt null
+                  if controlId?
                     conversation = conversationIds[i].conversation
-
                     logger.debug "setting latest control id: #{controlId} for conversation: #{conversation}"
-                    controlIds[conversation] =  controlId)
+                    controlId = parseInt(controlId, 10)
+                    controlIds[conversation] = controlId)
 
-              if latestMessageIds?
+              if Object.keys(latestMessageIds).length > 0
                 data.conversationIds = latestMessageIds
 
-              if controlIds.length > 0
+              if Object.keys(controlIds).length > 0
                 data.controlIds = controlIds
 
               addNewMessages = (callback) ->
-                if spotIds?.length > 0
+                keys = Object.keys(spotIds)
+                if keys.length > 0
                   messages = []
                   #get messages
                   async.each(
-                    spotIds,
-                    (item, callback1) ->
-                      spot = common.getSpotName username, item.u
-                      getMessagesAndControlMessagesOpt(username, item.u, parseInt(item.m, 10),  latestMessageIds[spot], parseInt(item.cm, 10), controlIds[spot], false, (err, data) ->
+                    keys,
+                    (spot, callback1) ->
+                      item = spotIds[spot]
+                      getMessagesAndControlMessagesOpt(username, item.u, item.m, latestMessageIds[spot], item.cm, controlIds[spot], false, (err, data) ->
                         return callback1() if err?
                         if data?
                           messages.push data
