@@ -43,6 +43,7 @@ MAX_MESSAGE_LENGTH = 500000
 MAX_HTTP_REQUEST_LENGTH = 500000
 NUM_CORES =  parseInt(process.env.SURESPOT_CORES, 10) ? 4
 GCM_TTL = 604800
+GCM_RETRIES = 6
 
 oneYear = 31536000000
 oneDay = 86400
@@ -1040,7 +1041,7 @@ else
         logger.debug "gcm data set"
 
         logger.debug "sending push messages to: #{ids[0]}"
-        sender.send gcmmessage, gcmIds, 4, (err, result) ->
+        sender.send gcmmessage, gcmIds, GCM_RETRIES, (err, result) ->
           return logger.error "Error sending gcm: #{err}" if err? or not result?
           logger.debug "sendGcm result: #{JSON.stringify(result)}"
 
@@ -2163,15 +2164,7 @@ else
     #older versions won't have platform set so tell them to upgrade
     return res.send 403 if platform isnt 'ios' and platform isnt 'android'
 
-    #ios version 1 can't save identities with extended chars properly
-    if platform is 'ios'
-      versions = version?.split ":"
-      #tell them to upgrade
-      intVersion = parseInt versions?[0]
-      if isNaN intVersion
-        return res.send 403
-      else
-        return res.send 403 if intVersion < 2
+    #ios handled by validateVersion
 
     #android < 49 doesn't handle some chars in auto invite links
     #tell them to upgrade if < 49
@@ -2268,11 +2261,20 @@ else
       res.send exists
 
   validateVersion = (req, res, next) ->
-    version = req.body.version ? "not sent"
+    version = req.body.version ? "0:0"
     platform = req.body.platform
     logger.debug "validate platform #{platform}, version: #{version}"
-    #reserved for future use, will send 403 if version is not acceptable
-    #res.send 403
+
+    #don't let them login unless ios version >= 6
+    if platform is 'ios'
+      versions = version?.split ":"
+      #tell them to upgrade
+      intVersion = parseInt versions?[0]
+      if isNaN intVersion
+        return res.send 403
+      else
+        return res.send 403 if intVersion < 6
+
     next()
 
 
@@ -2358,7 +2360,7 @@ else
 
 
   #end unauth'd methods
-  app.post "/login", initSession, passport.authenticate("local"), validateVersion, updatePushIds, updatePurchaseTokensMiddleware(true), (req, res, next) ->
+  app.post "/login", validateVersion, initSession, passport.authenticate("local"), updatePushIds, updatePurchaseTokensMiddleware(true), (req, res, next) ->
     username = req.user
     logger.debug "/login post, user #{username}"
 
@@ -2565,7 +2567,7 @@ else
         gcmmessage.timeToLive = GCM_TTL
         #gcmmessage.collapseKey = "invite:#{friendname}"
 
-        sender.send gcmmessage, gcmIds, 4, (err, result) ->
+        sender.send gcmmessage, gcmIds, GCM_RETRIES, (err, result) ->
           return logger.error "Error sending gcm: #{err}" if err? or not result?
           logger.debug "sent gcm for invite: #{JSON.stringify(result)}"
           if result.failure > 0
@@ -2699,7 +2701,7 @@ else
         gcmmessage.timeToLive = GCM_TTL
         #gcmmessage.collapseKey = "inviteResponse"
 
-        sender.send gcmmessage, gcmIds, 4, (err, result) ->
+        sender.send gcmmessage, gcmIds, GCM_RETRIES, (err, result) ->
           return logger.error "Error sending gcm: #{err}" if err? or not result?
           logger.debug "sendGcm for invite response notification ok #{username} #{friendname}"
           if result.failure > 0
