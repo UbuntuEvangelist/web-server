@@ -1042,7 +1042,7 @@ else
 
         logger.debug "sending push messages to: #{ids[0]}"
         sender.send gcmmessage, gcmIds, GCM_RETRIES, (err, result) ->
-          return logger.error "Error sending gcm: #{err}" if err? or not result?
+          return logger.error "Error sending message gcm from: #{message.from}, to: #{message.to}: #{err}" if err? or not result?
           logger.debug "sendGcm result: #{JSON.stringify(result)}"
 
           if result.failure > 0
@@ -2568,7 +2568,7 @@ else
         #gcmmessage.collapseKey = "invite:#{friendname}"
 
         sender.send gcmmessage, gcmIds, GCM_RETRIES, (err, result) ->
-          return logger.error "Error sending gcm: #{err}" if err? or not result?
+          return logger.error "Error sending invite gcm from: #{username}, to: #{friendname}: #{err}" if err? or not result?
           logger.debug "sent gcm for invite: #{JSON.stringify(result)}"
           if result.failure > 0
             removeGcmIds friendname, gcmIds, result.results
@@ -2702,7 +2702,7 @@ else
         #gcmmessage.collapseKey = "inviteResponse"
 
         sender.send gcmmessage, gcmIds, GCM_RETRIES, (err, result) ->
-          return logger.error "Error sending gcm: #{err}" if err? or not result?
+          return logger.error "Error sending push invite gcm from: #{username}, to: #{friendname}: #{err}" if err? or not result?
           logger.debug "sendGcm for invite response notification ok #{username} #{friendname}"
           if result.failure > 0
             removeGcmIds friendname, gcmIds, result.results
