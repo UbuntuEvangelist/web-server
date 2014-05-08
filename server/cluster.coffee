@@ -702,6 +702,9 @@ else
 
     #validate with apple
     iapClient.verifyReceipt receipt, true, (valid, msg, data) ->
+      #do nothing on error
+      return if msg is 'error'
+
       #see if we have valid voice messaging product id
       #looks like you get different results for different receipts ?@$$@#%
       inapp = data?.receipt?.in_app
