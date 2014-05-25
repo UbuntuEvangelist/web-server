@@ -44,6 +44,7 @@ MAX_HTTP_REQUEST_LENGTH = 500000
 NUM_CORES =  parseInt(process.env.SURESPOT_CORES, 10) ? 4
 GCM_TTL = 604800
 GCM_RETRIES = 6
+MAX_GCM_SOCKETS = 20
 
 oneYear = 31536000000
 oneDay = 86400
@@ -1028,7 +1029,7 @@ else
         logger.debug "sending gcms for message"
         gcmmessage = new gcm.Message()
         logger.debug "gcm message created"
-        sender = new gcm.Sender("#{googleApiKey}")
+        sender = new gcm.Sender("#{googleApiKey}",  {maxSockets: MAX_GCM_SOCKETS})
         logger.debug "gcm sender created"
         gcmmessage.addData("type", "message")
         gcmmessage.addData("to", message.to)
@@ -2562,7 +2563,7 @@ else
       if gcmIds?.length > 0
         logger.debug "sending gcms for invite"
         gcmmessage = new gcm.Message()
-        sender = new gcm.Sender("#{googleApiKey}")
+        sender = new gcm.Sender("#{googleApiKey}", {maxSockets: MAX_GCM_SOCKETS})
         gcmmessage.addData "type", "invite"
         gcmmessage.addData "sentfrom", username
         gcmmessage.addData "to", friendname
@@ -2695,7 +2696,7 @@ else
         logger.debug "sending gcms for invite response notification #{username} #{friendname}"
 
         gcmmessage = new gcm.Message()
-        sender = new gcm.Sender("#{googleApiKey}")
+        sender = new gcm.Sender("#{googleApiKey}", {maxSockets: MAX_GCM_SOCKETS})
         gcmmessage.addData("type", "inviteResponse")
         gcmmessage.addData "sentfrom", username
         gcmmessage.addData "to", friendname
