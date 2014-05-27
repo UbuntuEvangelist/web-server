@@ -44,7 +44,6 @@ MAX_HTTP_REQUEST_LENGTH = 500000
 NUM_CORES =  parseInt(process.env.SURESPOT_CORES, 10) ? 4
 GCM_TTL = 604800
 GCM_RETRIES = 6
-MAX_GCM_SOCKETS = 20
 
 oneYear = 31536000000
 oneDay = 86400
@@ -58,6 +57,7 @@ RATE_LIMIT_SECS_MESSAGE = process.env.SURESPOT_RATE_LIMIT_SECS_MESSAGE ? 10
 RATE_LIMIT_RATE_MESSAGE = process.env.SURESPOT_RATE_LIMIT_RATE_MESSAGE ? 100
 
 MESSAGES_PER_USER = process.env.SURESPOT_MESSAGES_PER_USER ? 500
+MAX_GCM_SOCKETS = process.env.SURESPOT_MAX_GCM_SOCKETS ? 30
 debugLevel = process.env.SURESPOT_DEBUG_LEVEL ? 'debug'
 database = process.env.SURESPOT_DB ? 0
 socketPort = process.env.SURESPOT_SOCKET ? 8080
@@ -154,6 +154,7 @@ if (cluster.isMaster and NUM_CORES > 1)
   logger.warn "redis sentinel port: #{redisSentinelPort}"
   logger.warn "redis password: #{redisPassword}"
   logger.warn "cassandra urls: #{process.env.SURESPOT_CASSANDRA_IPS ? '127.0.0.1'}"
+  logger.warn "max gcm sockets: #{MAX_GCM_SOCKETS}"
 
 else
 
@@ -187,6 +188,7 @@ else
     logger.warn "redis password: #{redisPassword}"
     logger.warn "use redis sentinel: #{useRedisSentinel}"
     logger.warn "cassandra urls: #{process.env.SURESPOT_CASSANDRA_IPS ? '127.0.0.1'}"
+    logger.warn "max gcm sockets: #{MAX_GCM_SOCKETS}"
 
   sio = null
   sessionStore = null
