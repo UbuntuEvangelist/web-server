@@ -311,9 +311,9 @@ else
     app.set 'views', "#{__dirname}/views"
     app.set 'view engine', 'jade'
 
-    #app.use(require('express-bunyan-logger')({name: 'surespot', streams : bunyanStreams }));
+    app.use(require('express-bunyan-logger')({name: 'surespot', streams : bunyanStreams }));
     app.use app.router
-    #app.use(require('express-bunyan-logger').errorLogger({name: 'surespot', streams : bunyanStreams }));
+    app.use(require('express-bunyan-logger').errorLogger({name: 'surespot', streams : bunyanStreams }));
     app.use (err, req, res, next) ->
       res.send err.status or 500
 
@@ -1633,6 +1633,8 @@ else
           cdn = rackspaceCdnVoiceBaseUrl
           container = rackspaceVoiceContainer
 
+          return callback()
+
           os = uaparser.parseOS req.headers['user-agent']
           family = os.family
           logger.debug "family: #{family}"
@@ -2260,6 +2262,102 @@ else
                       else
                         next()
 
+  createNewUser2 = (req, res, next) ->
+    username = req.body.username
+    password = req.body.password
+    version = req.body.version
+    platform = req.body.platform
+
+    userExistsOrDeleted username, true, (err, exists) ->
+      return next err if err?
+      if exists
+        logger.debug "user already exists"
+        return res.send 409
+      else
+        user = {}
+        user.username = username
+        user.kv = 1
+
+        keys = {}
+        keys.version = 1
+        if req.body?.dhPub?
+          keys.dhPub = req.body.dhPub
+        else
+          return next new Error('dh public key required')
+
+        if req.body?.dsaPub?
+          keys.dsaPub = req.body.dsaPub
+        else
+          return next new Error('dsa public key required')
+
+        return next new Error('auth signature 2 required') unless req.body?.authSig2?
+        return next new Error('client signature required') unless req.body?.clientSig?
+
+        sig = req.body.clientSig
+        #check sig
+        verified = verifyClientSignature username, 1, keys.dhPub, sig, keys.dsaPub
+
+        return res.send 400 unless verified
+
+        #store client sig
+        keys.clientSig = sig
+
+        if req.body?.gcmId?
+          user.gcmId = req.body.gcmId
+
+
+        referrers = null
+
+        if req.body?.referrers?
+          try
+            referrers = JSON.parse(req.body.referrers)
+          catch error
+            logger.error "createNewUser, error: #{error}"
+            return next error
+
+
+        logger.debug "gcmID: #{user.gcmId}"
+        logger.debug "referrers: #{req.body.referrers}"
+
+        bcrypt.genSalt 10, 32, (err, salt) ->
+          return next err if err?
+          bcrypt.hash password, salt, (err, password) ->
+            return next err if err?
+            user.password = password
+
+            #sign the keys - maintained for backwards compatibility
+            keys.dhPubSig = crypto.createSign('sha256').update(new Buffer(keys.dhPub)).sign(serverPrivateKey, 'base64')
+            keys.dsaPubSig = crypto.createSign('sha256').update(new Buffer(keys.dsaPub)).sign(serverPrivateKey, 'base64')
+
+            logger.debug "#{username}, dhPubSig: #{keys.dhPubSig}, dsaPubSig: #{keys.dsaPubSig}"
+
+            #user id
+            rc.incr "uid", (err, newid) ->
+              return next err if err?
+
+              user.id = newid
+
+              cdb.insertPublicKeys username, keys, (err, result) ->
+                return next err if err?
+                multi = rc.multi()
+                multi.hmset "u:#{username}", user
+                multi.sadd "u", username
+                multi.exec (err,replies) ->
+                  return next err if err?
+                  logger.warn "#{username} created, uid: #{user.id}, platform: #{platform}, version: #{version}"
+
+                  #now we have a user we can create a session
+                  initSession req, res, (err) ->
+                    if err?
+                      req.session?.destroy()
+                      return next(err)
+
+                    req.login username, ->
+                      if referrers
+                        handleReferrers username, referrers, next
+                      else
+                        next()
+
   app.get "/users/:username/exists", setNoCache, (req, res, next) ->
     logger.debug "/users/#{req.params.username}/exists"
     userExistsOrDeleted req.params.username, true, (err, exists) ->
@@ -2364,6 +2462,15 @@ else
     (req, res, next) ->
       res.send 201
 
+  #protocol changes
+  app.post "/users2",
+    validateUsernamePassword,
+    createNewUser2,
+    passport.authenticate("local"),
+    updatePushIds,
+    updatePurchaseTokensMiddleware(true),
+    (req, res, next) ->
+      res.send 201
 
   #end unauth'd methods
   app.post "/login", validateVersion, initSession, passport.authenticate("local"), updatePushIds, updatePurchaseTokensMiddleware(true), (req, res, next) ->
@@ -3227,6 +3334,24 @@ else
   comparePassword = (password, dbpassword, callback) ->
     bcrypt.compare password, dbpassword, callback
 
+  #protocol 2 will only ever use 1st version of signing key
+  getAuth2Keys = (username, callback) ->
+    rc.hget "u:#{username}", "kv", (err, version) ->
+      return callback err if err?
+      return callback new Error "no keys exist for user: #{username}" unless version?
+      getKeys username, version, (err, latestKeys) ->
+        return callback err if err?
+        keys = {}
+        keys.latest = latestKeys
+        if version is "1"
+          keys.first = latestKeys
+          return callback null, keys
+        else
+          getKeys username, 1, (err, firstKeys) ->
+            keys.first = firstKeys
+            return callback err if err?
+            callback null, keys
+
   getLatestKeys = (username, callback) ->
     rc.hget "u:#{username}", "kv", (err, version) ->
       return callback err if err?
@@ -3249,11 +3374,20 @@ else
     return crypto.createVerify('sha256').update(b1).update(b2).update(random).verify(pubKey, signature)
 
 
-  validateUser = (username, password, signature, done) ->
+  verifyClientSignature = (username, version, dhPubKey, sigString, dsaSigningKey) ->
+    return false unless username?.length > 0 && version? && dhPubKey.length > 0 && sigString?.length > 0 && dsaSigningKey?.length > 0    #get the signature
+    signature = new Buffer(sigString, 'base64')
+    vbuffer = new Buffer(4)
+    vbuffer.writeInt32BE(version, 0)
+    return crypto.createVerify('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(dhPubKey)).verify(dsaSigningKey, signature)
+
+
+
+  validateUser = (username, password, signature, protocolVersion, done) ->
     return done(null, 403) if (!checkUser(username) or !checkPassword(password))
     return done(null, 403) if signature?.length < 16
     userKey = "u:" + username
-    logger.debug "validating: " + username
+    logger.debug "validating: #{username}, protocolVersion: #{protocolVersion}"
 
     multi = rc.multi()
     multi.sismember "u", username
@@ -3267,12 +3401,20 @@ else
         return done err if err?
         return done null, 403 unless res
 
+
+        getKeys2 = (callback) ->
+          if protocolVersion is 1
+            getLatestKeys username, callback
+          else
+            getAuth2Keys username, callback
+
+
         #not really worried about replay attacks here as we're using ssl but as extra security the server could send a challenge that the client would sign as we do with key roll
-        getLatestKeys username, (err, keys) ->
+        getKeys2 (err, keys) ->
           return done err if err?
           return done new Error "no keys exist for user #{username}" unless keys?
 
-          verified = verifySignature new Buffer(username), new Buffer(password), signature, keys.dsaPub
+          verified = verifySignature new Buffer(username), new Buffer(password), signature, if protocolVersion is 1 then keys.dsaPub else keys.first.dsaPub
           logger.debug "validated, #{username}: #{verified}"
 
           status = if verified then 204 else 403
@@ -3281,8 +3423,10 @@ else
 
   passport.use new LocalStrategy ({passReqToCallback: true}), (req, username, password, done) ->
     #logger.debug "client ip: #{req.connection.remoteAddress}"
-    signature = req.body.authSig
-    validateUser username, password, signature, (err, status, vusername) ->
+
+    protocolVersion = if req.body.authSig2? then 2 else 1
+    signature = req.body.authSig2 ? req.body.authSig
+    validateUser username, password, signature, protocolVersion, (err, status, vusername) ->
       if err?
         req.session?.destroy()
         return done(err)

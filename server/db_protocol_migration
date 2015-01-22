@@ -1,0 +1,1 @@
+ALTER TABLE publickeys ADD clientsig varchar;

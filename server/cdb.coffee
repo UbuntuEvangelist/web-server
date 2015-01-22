@@ -531,25 +531,33 @@ exports.deleteAll = (username, callback) ->
 
 #public keys
 exports.insertPublicKeys = (username, keys, callback) ->
-  cql =
-    "INSERT INTO publickeys (username, version, dhPub, dhPubSig, dsaPub, dsaPubSig)
-         VALUES (?,?,?,?,?,?);"
-
-  #logger.debug "sending cql #{cql}"
-
-  pool.cql cql, [
+  params = [
     username,
     keys.version,
     keys.dhPub,
     keys.dhPubSig,
     keys.dsaPub,
     keys.dsaPubSig
-  ], (err, results) ->
+  ]
+
+  insert = "INSERT INTO publickeys (username, version, dhPub, dhPubSig, dsaPub, dsaPubSig"
+  values = "VALUES (?,?,?,?,?,?"
+
+  if keys.clientSig?
+    insert += ", clientSig) "
+    values += ", ?);"
+    params.push keys.clientSig
+  else
+    insert += "( "
+    values += ");"
+
+  cql = insert + values
+  #logger.debug "sending cql #{cql}"
+
+  pool.cql cql, params, (err, results) ->
     if err?
       logger.error "error inserting public keys for #{username}, version: #{keys.version}"
     callback(err,results)
-
-
 
 
 exports.remapPublicKeys = (results) ->
@@ -569,6 +577,8 @@ exports.remapPublicKeys = (results) ->
           keys['dsaPubSig'] = value
         when 'version'
           keys['version'] = "#{value}"
+        when 'clientsig'
+          keys['clientSig'] = value
         when 'username'
           return
         else
