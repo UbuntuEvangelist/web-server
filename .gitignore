@@ -19,3 +19,6 @@ results
 npm-debug.log
 
 *.js
+server/apn*
+server/ec*
+server/env

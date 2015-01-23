@@ -84,8 +84,8 @@ login = (username, password, authSig, done, callback) ->
     json:
       username: username
       password: password
-      authSig: authSig
-      version: 56
+      authSig2: authSig
+      version: 60
       platform:'android'
     (err, res, body) ->
       if err
@@ -306,260 +306,45 @@ describe "auth 2 tests", () ->
                     done()
 
 #
-#    it "should not be able to login with the old signature", (done) ->
-#      login "test0", "test0", oldKeys[0].sig, done, (res, body) ->
-#        res.statusCode.should.equal 401
-#        done()
+  describe "should not be able to login with the new signature", ->
+    it "should return 401", (done) ->
+      login "test0", "test0", keys[0].authSig, done, (res, body) ->
+        res.statusCode.should.equal 401
+        done()
+#
+  describe "login with invalid password", ->
+    it "should return 401", (done) ->
+      login "test0", "bollocks", oldKeys[0].sig, done, (res, body) ->
+        res.statusCode.should.equal 401
+        done()
+
+  describe "login with short signature", ->
+    it "should return 401", (done) ->
+      login "test0", "test0", "martin", done, (res, body) ->
+        res.statusCode.should.equal 401
+        done()
 #
 #
-#  describe "login with invalid password", ->
-#    it "should return 401", (done) ->
-#      login "test0", "bollocks", keys[0].sig, done, (res, body) ->
-#        res.statusCode.should.equal 401
-#        done()
+  describe "login with invalid signature", ->
+    it "should return 401", (done) ->
+      login "test0", "test0", "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean venenatis dictum viverra. Duis vel justo vel purus hendrerit consequat. Duis ac nisi at ante elementum faucibus in eget lorem. Morbi cursus blandit sollicitudin. Aenean tincidunt, turpis eu malesuada venenatis, urna eros sagittis augue, et vehicula quam turpis at risus. Sed ac orci a tellus semper tincidunt eget non lorem. In porta nisi eu elit porttitor pellentesque vestibulum purus luctus. Nam venenatis porta porta. Vestibulum eget orci massa. Fusce laoreet vestibulum lacus ut hendrerit. Proin ac eros enim, ac faucibus eros. Aliquam erat volutpat.",
+      done, (res, body) ->
+        res.statusCode.should.equal 401
+        done()
 #
-#  describe "login with short signature", ->
-#    it "should return 401", (done) ->
-#      login "test0", "test0", "martin", done, (res, body) ->
-#        res.statusCode.should.equal 401
-#        done()
-#
-#
-#  describe "login with invalid signature", ->
-#    it "should return 401", (done) ->
-#      login "test0", "test0", "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean venenatis dictum viverra. Duis vel justo vel purus hendrerit consequat. Duis ac nisi at ante elementum faucibus in eget lorem. Morbi cursus blandit sollicitudin. Aenean tincidunt, turpis eu malesuada venenatis, urna eros sagittis augue, et vehicula quam turpis at risus. Sed ac orci a tellus semper tincidunt eget non lorem. In porta nisi eu elit porttitor pellentesque vestibulum purus luctus. Nam venenatis porta porta. Vestibulum eget orci massa. Fusce laoreet vestibulum lacus ut hendrerit. Proin ac eros enim, ac faucibus eros. Aliquam erat volutpat.",
-#      done, (res, body) ->
-#        res.statusCode.should.equal 401
-#        done()
-#
-#  describe "login with non existant user", ->
-#    it "should return 401", (done) ->
-#      login "your", "mama", "what kind of sig is this?", done, (res, body) ->
-#        res.statusCode.should.equal 401
-#        done()
+  describe "login with non existant user", ->
+    it "should return 401", (done) ->
+      login "your", "mama", "what kind of sig is this?", done, (res, body) ->
+        res.statusCode.should.equal 401
+        done()
 #
 #
-#  describe "login with valid credentials", ->
-#    it "should return 204", (done) ->
-#      login "test0", "test0", keys[0].sig, done, (res, body) ->
-#        res.statusCode.should.equal 204
-#        done()
-#
-#  describe 'validate valid user', ->
-#    it "should return 204", (done) ->
-#      http.post
-#        url: baseUri + "/validate"
-#        json:
-#          username: 'test0'
-#          password: 'test0'
-#          authSig: keys[0].sig
-#        (err, res, body) ->
-#          if err
-#            done err
-#          else
-#            res.statusCode.should.equal 204
-#            done()
-#
-#
-#  describe "invite exchange", ->
-#    it "created user", (done) ->
-#      signup "test1", "test1", keys[1].ecdh.pem_pub, keys[1].ecdsa.pem_pub, keys[1].sig, done, (res, body) ->
-#        res.statusCode.should.equal 201
-#        done()
-#
-#    it "should not be allowed to invite himself", (done) ->
-#      http.post
-#        url: baseUri + "/invite/test1"
-#        (err, res, body) ->
-#          if err
-#            done err
-#          else
-#            res.statusCode.should.equal 403
-#            done()
-#
-#
-#    it "who invites a user successfully should receive 204", (done) ->
-#      http.post
-#        url: baseUri + "/invite/test0"
-#        (err, res, body) ->
-#          if err
-#            done err
-#          else
-#            res.statusCode.should.equal 204
-#            done()
-#
-#    it "who invites them again should receive 403", (done) ->
-#      http.post
-#        url: baseUri + "/invite/test0"
-#        (err, res, body) ->
-#          if err
-#            done err
-#          else
-#            res.statusCode.should.equal 403
-#            done()
-#
-#    it "who accepts their invite should receive 204", (done) ->
-#      login "test0", "test0", keys[0].sig, done, (res, body) ->
-#        http.post
-#          url: baseUri + "/invites/test1/accept"
-#          (err, res, body) ->
-#            if err
-#              done err
-#            else
-#              res.statusCode.should.equal 204
-#              done()
-#
-#    it "who accepts a non existent invite should receive 404", (done) ->
-#      http.post
-#        url: baseUri + "/invites/nosuchinvite/accept"
-#        (err, res, body) ->
-#          if err
-#            done err
-#          else
-#            res.statusCode.should.equal 404
-#            done()
-#
-#
-#    it "who invites them again should receive a 409", (done) ->
-#      http.post
-#        url: baseUri + "/invite/test1"
-#        (err, res, body) ->
-#          if err
-#            done err
-#          else
-#            res.statusCode.should.equal 409
-#            done()
-#
-#
-#  describe "inviting non existent user", ->
-#    it "should return 404", (done) ->
-#      http.post
-#        url: baseUri + "/invites/nosuchuser"
-#        (err, res, body) ->
-#          if err
-#            done err
-#          else
-#            res.statusCode.should.equal 404
-#            done()
-#
-#
-#  describe "getting the public identity of a non existant user", ->
-#    it "should return not found", (done) ->
-#      http.get
-#        url: baseUri + "/publicidentity/nosuchuser"
-#        (err, res, body) ->
-#          if err
-#            done err
-#          else
-#            res.statusCode.should.equal 404
-#            done()
-#
-#  describe "getting the public identity of a non friend user", ->
-#    it "should not be allowed", (done) ->
-#      signup "test2", "test2", keys[2].ecdh.pem_pub, keys[2].ecdsa.pem_pub, keys[2].sig, done, (res, body) ->
-#        res.statusCode.should.equal 201
-#        http.get
-#          url: baseUri + "/publickeys/test0"
-#          (err, res, body) ->
-#            if err
-#              done err
-#            else
-#              res.statusCode.should.equal 403
-#              done()
-#
-#  describe "getting other user's message data", ->
-#    it "should not be allowed", (done) ->
-#      http.get
-#        url: baseUri + "/messagedata/test0/0/0"
-#        (err, res, body) ->
-#          if err
-#            done err
-#          else
-#            res.statusCode.should.equal 403
-#            done()
-#
-#  describe "getting other user's messages after x", ->
-#    it "should not be allowed", (done) ->
-#      http.get
-#        url: baseUri + "/messagedata/test0/0/0"
-#        (err, res, body) ->
-#          if err
-#            done err
-#          else
-#            res.statusCode.should.equal 403
-#            done()
-#
-#  describe "getting other user's messages before x", ->
-#    it "should not be allowed", (done) ->
-#      http.get
-#        url: baseUri + "/messages/test0/before/100"
-#        (err, res, body) ->
-#          if err
-#            done err
-#          else
-#            res.statusCode.should.equal 403
-#            done()
-#
-#  describe "uploading an image to a valid spot", ->
-#    it "should return the 200", (done) ->
-#      login "test0", "test0", keys[0].sig, done, (res, body) ->
-#        res.statusCode.should.equal 204
-#        r = http.post baseUri + "/images/1/test1/1", (err, res, body) ->
-#          if err
-#            done err
-#          else
-#            res.statusCode.should.equal 200
-#            done()
-#
-#        form = r.form()
-#        form.append "image", fs.createReadStream "test/testImage"
-#
-#  #todo add test to make sure we receive associated message and download the image
-#
-#  describe "uploading an image for a friend ", ->
-#    location = undefined
-#    it "should return 200 and the image url", (done) ->
-#      login "test0", "test0", keys[0].sig, done, (res, body) ->
-#        res.statusCode.should.equal 204
-#        r = http.post baseUri + "/images/test1/1", (err, res, body) ->
-#          if err
-#            done err
-#          else
-#            res.statusCode.should.equal 200
-#            location = body
-#            should.exists location
-#            done()
-#
-#        form = r.form()
-#        form.append "image", fs.createReadStream "test/testImage"
-#    #todo set filename explicitly
-#
-#    it "should return the same friend image when url requested", (done) ->
-#      http.get
-#        url: location
-#        (err, res, body) ->
-#          if err
-#            done err
-#          else
-#            res.statusCode.should.equal 200
-#            res.body.should.equal "madman\n"
-#            done()
-#
-#  describe "uploading an image to a spot we don't belong to", ->
-#    it "should not be allowed", (done) ->
-#      login "test2", "test2", keys[2].sig, done, (res, body) ->
-#        res.statusCode.should.equal 204
-#
-#        r = http.post baseUri + "/images/1/test1/1", (err, res, body) ->
-#          if err
-#            done err
-#          else
-#            res.statusCode.should.equal 403
-#            done()
-#
-#        form = r.form()
-#        form.append "image", fs.createReadStream "test/testImage", { contentType: "image/"}
-#
+  describe "login with valid credentials", ->
+    it "should return 204", (done) ->
+      login "test0", "test0", oldKeys[0].authSig, done, (res, body) ->
+        res.statusCode.should.equal 204
+        done()
+
 
   #todo set filename explicitly
   after (done) ->
