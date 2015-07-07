@@ -2288,7 +2288,7 @@ else
         else
           return next new Error('dsa public key required')
 
-        return next new Error('auth signature 2 required') unless req.body?.authSig2?
+        return next new Error('auth signature required') unless req.body?.authSig?
         return next new Error('client signature required') unless req.body?.clientSig?
 
         sig = req.body.clientSig
@@ -2326,6 +2326,13 @@ else
             #sign the keys - maintained for backwards compatibility
             keys.dhPubSig = crypto.createSign('sha256').update(new Buffer(keys.dhPub)).sign(serverPrivateKey, 'base64')
             keys.dsaPubSig = crypto.createSign('sha256').update(new Buffer(keys.dsaPub)).sign(serverPrivateKey, 'base64')
+
+            #protocol 2 includes username and version in signature
+            vbuffer = new Buffer(4)
+            vbuffer.writeInt32BE(1, 0)
+            keys.dhPubSig2 = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(keys.dhPub)).sign(serverPrivateKey, 'base64')
+            keys.dsaPubSig2 = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(keys.dsaPub)).sign(serverPrivateKey, 'base64')
+
 
             logger.debug "#{username}, dhPubSig: #{keys.dhPubSig}, dsaPubSig: #{keys.dsaPubSig}"
 
@@ -2645,7 +2652,7 @@ else
     logger.debug "/keys2"
     return res.send 400 unless req.body?.username?
     return res.send 400 unless req.body?.password?
-    return res.send 400 unless req.body?.authSig2?
+    return res.send 400 unless req.body?.authSig?
     return res.send 400 unless req.body?.clientSig?
     return next new Error('dh public key required') unless req.body?.dhPub?
     return next new Error('dsa public key required') unless req.body?.dsaPub?
@@ -2678,7 +2685,7 @@ else
         newKeys.dsaPub = req.body.dsaPub
 
         logger.debug "received token signature: " + req.body.tokenSig
-        logger.debug "received auth 2 signature: " + req.body.authSig2
+        logger.debug "received auth signature: " + req.body.authSig
         logger.debug "token: " + rtoken
 
         password = req.body.password
@@ -2690,12 +2697,12 @@ else
           return next new Error "no keys exist for user #{username}" unless keys?
 
 
-          verified = verifySignature new Buffer(rtoken, 'base64'), new Buffer(password), req.body.tokenSig, keys.previous.dsaPub
+          verified = verifySignature new Buffer(rtoken, 'base64'), new Buffer(password), req.body.tokenSig, keys.latest.dsaPub
           return res.send 403 unless verified
 
           logger.debug "token signature verified"
 
-          authSig = req.body.authSig2
+          authSig = req.body.authSig
           validateUser username, password, authSig, (err, status, user) ->
             return next err if err?
             return res.send 403 unless user?
@@ -2714,11 +2721,16 @@ else
               return next err if err?
               return res.send 404 unless rdel is 1
 
-              #sign the keys
+              #sign the keys protocol v1
               newKeys.dhPubSig = crypto.createSign('sha256').update(new Buffer(newKeys.dhPub)).sign(serverPrivateKey, 'base64')
               newKeys.dsaPubSig = crypto.createSign('sha256').update(new Buffer(newKeys.dsaPub)).sign(serverPrivateKey, 'base64')
               logger.debug "saving keys #{username}, dhPubSig: #{newKeys.dhPubSig}, dsaPubSig: #{newKeys.dsaPubSig}"
 
+              #protocol v2 includes username and version in signature
+              vbuffer = new Buffer(4)
+              vbuffer.writeInt32BE(1, 0)
+              newKeys.dhPubSig2 = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(newKeys.dhPub)).sign(serverPrivateKey, 'base64')
+              newKeys.dsaPubSig2 = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(newKeys.dsaPub)).sign(serverPrivateKey, 'base64')
               newKeys.clientSig = clientSig
 
               #add the keys to the key set and add revoke message in transaction

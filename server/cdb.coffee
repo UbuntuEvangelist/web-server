@@ -544,11 +544,13 @@ exports.insertPublicKeys = (username, keys, callback) ->
   values = "VALUES (?,?,?,?,?,?"
 
   if keys.clientSig?
-    insert += ", clientSig) "
-    values += ", ?);"
-    params.push keys.clientSig
+
+    insert += ",clientSig,dhPubSig2,dsaPubSig2) "
+    values += ",?,?,?);"
+    params.push keys.clientSig, keys.dhPubSig2, keys.dsaPubSig2
   else
-    insert += "( "
+
+    insert += ") "
     values += ");"
 
   cql = insert + values
