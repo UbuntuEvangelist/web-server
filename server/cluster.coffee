@@ -1633,8 +1633,6 @@ else
           cdn = rackspaceCdnVoiceBaseUrl
           container = rackspaceVoiceContainer
 
-          return callback()
-
           os = uaparser.parseOS req.headers['user-agent']
           family = os.family
           logger.debug "family: #{family}"
@@ -2508,16 +2506,16 @@ else
   app.post "/keytoken2", setNoCache, (req, res, next) ->
     logger.debug "/keytoken2"
     return res.send 400 unless req.body?.username?
-    return res.send 400 unless req.body?.authSig2?
+    return res.send 400 unless req.body?.authSig?
     return res.send 400 unless req.body?.password?
     #return res.send 400 unless req.body?.clientSig?
 
     username = req.body.username
     password = req.body.password
-    authSig = req.body.authSig2
+    authSig = req.body.authSig
     #clientSig = req.body.clientSig
 
-    validateUser username, password, authSig, 2, (err, status, user) ->
+    validateUser username, password, authSig, (err, status, user) ->
       return next err if err?
       return res.send 403 unless user?
 
@@ -2650,8 +2648,6 @@ else
     return res.send 400 unless req.body?.authSig2?
     return res.send 400 unless req.body?.clientSig?
     return next new Error('dh public key required') unless req.body?.dhPub?
-
-    #TODO remove this when we cut off old protocol
     return next new Error('dsa public key required') unless req.body?.dsaPub?
 
 
@@ -2694,13 +2690,13 @@ else
           return next new Error "no keys exist for user #{username}" unless keys?
 
 
-          verified = verifySignature new Buffer(rtoken, 'base64'), new Buffer(password), req.body.tokenSig, keys.first.dsaPub
+          verified = verifySignature new Buffer(rtoken, 'base64'), new Buffer(password), req.body.tokenSig, keys.previous.dsaPub
           return res.send 403 unless verified
 
           logger.debug "token signature verified"
 
           authSig = req.body.authSig2
-          validateUser username, password, authSig, 2, (err, status, user) ->
+          validateUser username, password, authSig, (err, status, user) ->
             return next err if err?
             return res.send 403 unless user?
 
@@ -2708,7 +2704,7 @@ else
 
             #verify new client signature
             clientSig = req.body.clientSig
-            verified = verifyClientSignature username, newkv, newKeys.dhPub, clientSig, keys.first.dsaPub
+            verified = verifyClientSignature username, newkv, newKeys.dhPub, clientSig, keys.previous.dsaPub
             return res.send 403 unless verified
 
             logger.debug "client signature verified"
@@ -3494,7 +3490,7 @@ else
   comparePassword = (password, dbpassword, callback) ->
     bcrypt.compare password, dbpassword, callback
 
-  #protocol 2 will only ever use 1st version of signing key
+  #protocol 2 uses previous version of signing key
   getAuth2Keys = (username, callback) ->
     rc.hget "u:#{username}", "kv", (err, version) ->
       return callback err if err?
@@ -3504,11 +3500,12 @@ else
         keys = {}
         keys.latest = latestKeys
         if version is "1"
-          keys.first = latestKeys
+          keys.previous = latestKeys
           return callback null, keys
         else
-          getKeys username, 1, (err, firstKeys) ->
-            keys.first = firstKeys
+          previousVersion = parseInt(version, 10) - 1
+          getKeys username, previousVersion, (err, previousKeys) ->
+            keys.previous = previousKeys
             return callback err if err?
             callback null, keys
 
@@ -3543,11 +3540,11 @@ else
 
 
 
-  validateUser = (username, password, signature, protocolVersion, done) ->
+  validateUser = (username, password, signature, done) ->
     return done(null, 403) if (!checkUser(username) or !checkPassword(password))
     return done(null, 403) if signature?.length < 16
     userKey = "u:" + username
-    logger.debug "validating: #{username}, protocolVersion: #{protocolVersion}"
+    logger.debug "validating: #{username}"
 
     multi = rc.multi()
     multi.sismember "u", username
@@ -3561,20 +3558,12 @@ else
         return done err if err?
         return done null, 403 unless res
 
-
-        getKeys2 = (callback) ->
-          if protocolVersion is 1
-            getLatestKeys username, callback
-          else
-            getAuth2Keys username, callback
-
-
         #not really worried about replay attacks here as we're using ssl but as extra security the server could send a challenge that the client would sign as we do with key roll
-        getKeys2 (err, keys) ->
+        getLatestKeys username, (err, keys) ->
           return done err if err?
           return done new Error "no keys exist for user #{username}" unless keys?
 
-          verified = verifySignature new Buffer(username), new Buffer(password), signature, if protocolVersion is 1 then keys.dsaPub else keys.first.dsaPub
+          verified = verifySignature new Buffer(username), new Buffer(password), signature, keys.dsaPub
           logger.debug "validated, #{username}: #{verified}"
 
           status = if verified then 204 else 403
@@ -3583,10 +3572,8 @@ else
 
   passport.use new LocalStrategy ({passReqToCallback: true}), (req, username, password, done) ->
     #logger.debug "client ip: #{req.connection.remoteAddress}"
-
-    protocolVersion = if req.body.authSig2? then 2 else 1
-    signature = req.body.authSig2 ? req.body.authSig
-    validateUser username, password, signature, protocolVersion, (err, status, vusername) ->
+    signature = req.body.authSig
+    validateUser username, password, signature, (err, status, vusername) ->
       if err?
         req.session?.destroy()
         return done(err)
