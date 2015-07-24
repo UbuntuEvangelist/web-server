@@ -562,7 +562,7 @@ exports.insertPublicKeys = (username, keys, callback) ->
     callback(err,results)
 
 
-exports.remapPublicKeys = (results) ->
+exports.remapPublicKey= (results) ->
   keys = {}
   #map to array of json messages
   results.forEach (row) ->
@@ -579,6 +579,10 @@ exports.remapPublicKeys = (results) ->
           keys['dsaPubSig'] = value
         when 'version'
           keys['version'] = "#{value}"
+        when 'dhpubsig2'
+          keys['dhPubSig2'] = value
+        when 'dsapubsig2'
+          keys['dsaPubSig2'] = value
         when 'clientsig'
           keys['clientSig'] = value
         when 'username'
@@ -588,6 +592,38 @@ exports.remapPublicKeys = (results) ->
 
   return keys
 
+exports.remapPublicKeys = (results) ->
+  keys = []
+  #map to array of json messages
+  results.forEach (row) ->
+    key = {}
+    row.forEach (name, value, ts, ttl) ->
+      switch name
+        when 'dhpub'
+          key['dhPub'] = value
+        when 'dhpubsig'
+          key['dhPubSig'] = value
+        when 'dsapub'
+          key['dsaPub'] = value
+        when 'dsapubsig'
+          key['dsaPubSig'] = value
+        when 'version'
+          key['version'] = "#{value}"
+        when 'dhpubsig2'
+          key['dhPubSig2'] = value
+        when 'dsapubsig2'
+          key['dsaPubSig2'] = value
+        when 'clientsig'
+          key['clientSig'] = value
+        when 'username'
+          return
+        else
+          if value? then key[name] = value else return
+      keys.push key
+
+  return keys
+
+
 
 exports.getPublicKeys = (username, version, callback) ->
   logger.debug "getPublicKeys username: #{username}, version: #{version}"
@@ -596,7 +632,17 @@ exports.getPublicKeys = (username, version, callback) ->
     if err?
       logger.error "error getting public keys for #{username}, version: #{version}"
       return callback err
+    return callback null, @remapPublicKey results
+
+exports.getPublicKeysSince = (username, version, callback) ->
+  logger.debug "getPublicKeySince username: #{username}, version: #{version}"
+  cql = "select * from publickeys where username=? and version>=?;"
+  pool.cql cql, [username], (err, results) =>
+    if err?
+      logger.error "error getting public keys for #{username} since version: #{version}"
+      return callback err
     return callback null, @remapPublicKeys results
+
 
 
 exports.deletePublicKeys = (username, callback) ->

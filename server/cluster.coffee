@@ -2078,8 +2078,10 @@ else
         callback null, if data.messages? or data.controlMessages? then data else null
 
 
+  #TODO change url to "latest" - will probably go away after new client off
   app.get "/publickeys/:username", ensureAuthenticated, validateUsernameExistsOrDeleted, validateAreFriendsOrDeletedOrMe, setNoCache, getPublicKeys
   app.get "/publickeys/:username/:version", ensureAuthenticated, validateUsernameExistsOrDeleted, validateAreFriendsOrDeletedOrMe, setCache(oneYear), getPublicKeys
+  app.get "/publickeys/:username/since/:version", ensureAuthenticated, validateUsernameExistsOrDeleted, validateAreFriendsOrDeletedOrMe, setNoCache, getPublicKeysSince
   app.get "/keyversion/:username", ensureAuthenticated, validateUsernameExistsOrDeleted, validateAreFriendsOrDeleted,(req, res, next) ->
     rc.hget "u:#{req.params.username}", "kv", (err, version) ->
       return next err if err?
@@ -3530,6 +3532,12 @@ else
   getKeys = (username, version, callback) ->
     cdb.getPublicKeys username, parseInt(version, 10), callback
 
+  getPublicKeysSince = (req, res, next) ->
+    username = req.params.username
+    version = req.params.version
+    cdb.getPublicKeysSince username, version, (err, keys) ->
+      return next err if err?
+      res.send keys
 
   verifySignature = (b1, b2, sigString, pubKey) ->
     return false unless b1?.length > 0 && b2?.length > 0 && sigString?.length > 0 && pubKey?.length > 0
