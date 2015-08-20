@@ -2520,44 +2520,6 @@ else
             res.send {keyversion: kv, token: token}
 
 
-  app.post "/keytoken2", setNoCache, (req, res, next) ->
-    logger.debug "/keytoken2"
-    return res.send 400 unless req.body?.username?
-    return res.send 400 unless req.body?.authSig?
-    return res.send 400 unless req.body?.password?
-    #return res.send 400 unless req.body?.clientSig?
-
-    username = req.body.username
-    password = req.body.password
-    authSig = req.body.authSig
-    #clientSig = req.body.clientSig
-
-    validateUser username, password, authSig, (err, status, user) ->
-      return next err if err?
-      return res.send 403 unless user?
-
-
-
-      #the user wants to update their key so we will generate a token that the user signs to make sure they're not using a replay attack of some kind
-      #get the current version
-      rc.hget "u:#{username}", "kv", (err, currkv) ->
-        return next err if err?
-
-        #inc key version
-        kv = parseInt(currkv, 10) + 1
-
-        #verify client signature ?
-        #clientSig = req.body.clientSig
-        #verified = verifyClientSignature username, kv - 1, keys.latest.dhPub, clientSig, keys.first.dsaPub
-        #return res.send 403 unless verified
-
-
-        generateSecureRandomBytes 'base64',(err, token) ->
-          return next err if err?
-          rc.set "kt:#{username}", token, (err, result) ->
-            return next err if err?
-            res.send {keyversion: kv, token: token}
-
   app.post "/keys", (req, res, next) ->
     logger.debug "/keys"
     return res.send 400 unless req.body?.username?
@@ -2702,12 +2664,12 @@ else
 
         #validate the signature against the token
 
-        getAuth2Keys username, (err, keys) ->
+        getLatestKeys username, (err, currentKeys) ->
           return next err if err?
-          return next new Error "no keys exist for user #{username}" unless keys?
+          return next new Error "no keys exist for user #{username}" unless currentKeys?
 
 
-          verified = verifySignature new Buffer(rtoken, 'base64'), new Buffer(password), req.body.tokenSig, keys.latest.dsaPub
+          verified = verifySignature new Buffer(rtoken, 'base64'), new Buffer(password), req.body.tokenSig, currentKeys.dsaPub
           return res.send 403 unless verified
 
           logger.debug "token signature verified"
@@ -2721,7 +2683,7 @@ else
 
             #verify new client signature
             clientSig = req.body.clientSig
-            verified = verifyClientSignature username, newkv, newKeys.dhPub, clientSig, keys.previous.dsaPub
+            verified = verifyClientSignature username, newkv, newKeys.dhPub, clientSig, currentKeys.dsaPub
             return res.send 403 unless verified
 
             logger.debug "client signature verified"
@@ -2738,7 +2700,7 @@ else
 
               #protocol v2 includes username and version in signature
               vbuffer = new Buffer(4)
-              vbuffer.writeInt32BE(1, 0)
+              vbuffer.writeInt32BE(newkv, 0)
               newKeys.dhPubSig2 = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(newKeys.dhPub)).sign(serverPrivateKey, 'base64')
               newKeys.dsaPubSig2 = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(newKeys.dsaPub)).sign(serverPrivateKey, 'base64')
               newKeys.clientSig = clientSig
@@ -3511,25 +3473,6 @@ else
 
   comparePassword = (password, dbpassword, callback) ->
     bcrypt.compare password, dbpassword, callback
-
-  #protocol 2 uses previous version of signing key
-  getAuth2Keys = (username, callback) ->
-    rc.hget "u:#{username}", "kv", (err, version) ->
-      return callback err if err?
-      return callback new Error "no keys exist for user: #{username}" unless version?
-      getKeys username, version, (err, latestKeys) ->
-        return callback err if err?
-        keys = {}
-        keys.latest = latestKeys
-        if version is "1"
-          keys.previous = latestKeys
-          return callback null, keys
-        else
-          previousVersion = parseInt(version, 10) - 1
-          getKeys username, previousVersion, (err, previousKeys) ->
-            keys.previous = previousKeys
-            return callback err if err?
-            callback null, keys
 
   getLatestKeys = (username, callback) ->
     rc.hget "u:#{username}", "kv", (err, version) ->
