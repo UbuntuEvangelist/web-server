@@ -584,6 +584,14 @@ else
         return next err if err
         res.send keys
 
+  getPublicKeysSince = (req, res, next) ->
+    username = req.params.username
+    version = req.params.version
+    cdb.getPublicKeysSince username, parseInt(version,10), (err, keys) ->
+      return next err if err?
+      logger.debug "getPublicKeysSince, username: #{username}, version: #{version}, returning: #{JSON.stringify(keys)}"
+      res.send keys
+
   #oauth crap
   getAuthToken = (oauth2client, callback) ->
     #see if we have refresh token
@@ -3531,13 +3539,6 @@ else
 
   getKeys = (username, version, callback) ->
     cdb.getPublicKeys username, parseInt(version, 10), callback
-
-  getPublicKeysSince = (req, res, next) ->
-    username = req.params.username
-    version = req.params.version
-    cdb.getPublicKeysSince username, version, (err, keys) ->
-      return next err if err?
-      res.send keys
 
   verifySignature = (b1, b2, sigString, pubKey) ->
     return false unless b1?.length > 0 && b2?.length > 0 && sigString?.length > 0 && pubKey?.length > 0

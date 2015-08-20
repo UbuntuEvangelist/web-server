@@ -619,7 +619,7 @@ exports.remapPublicKeys = (results) ->
           return
         else
           if value? then key[name] = value else return
-      keys.push key
+    keys.push key
 
   return keys
 
@@ -637,10 +637,11 @@ exports.getPublicKeys = (username, version, callback) ->
 exports.getPublicKeysSince = (username, version, callback) ->
   logger.debug "getPublicKeySince username: #{username}, version: #{version}"
   cql = "select * from publickeys where username=? and version>=?;"
-  pool.cql cql, [username], (err, results) =>
+  pool.cql cql, [username,version], (err, results) =>
     if err?
       logger.error "error getting public keys for #{username} since version: #{version}"
       return callback err
+    #logger.debug "cdb.getPublicKeysSince: #{JSON.stringify(results)}"
     return callback null, @remapPublicKeys results
 
 
