@@ -610,15 +610,13 @@ exports.remapPublicKeys = (results) ->
         when 'version'
           key['version'] = "#{value}"
         when 'dhpubsig2'
-          key['dhPubSig2'] = value
+          if value? then key['dhPubSig2'] = value else return
         when 'dsapubsig2'
-          key['dsaPubSig2'] = value
+          if value? then key['dsaPubSig2'] = value else return
         when 'clientsig'
-          key['clientSig'] = value
-        when 'username'
-          return
+          if value? then key['clientSig'] = value else return
         else
-          if value? then key[name] = value else return
+          return
     keys.push key
 
   return keys
