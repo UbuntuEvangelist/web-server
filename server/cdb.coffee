@@ -1,6 +1,7 @@
 helenus = require 'helenus'
 common = require './common'
 bunyan = require 'bunyan'
+async = require 'async'
 pool = null
 
 debugLevel = process.env.SURESPOT_DEBUG_LEVEL ? 'debug'
@@ -638,6 +639,25 @@ exports.getPublicKeysSince = (username, version, callback) ->
     #logger.debug "cdb.getPublicKeysSince: #{JSON.stringify(results)}"
     return callback null, @remapPublicKeys results
 
+exports.updatePublicKeySignatures = (username, clientsigs, serversigs, callback) ->
+  cql = "update publickeys set clientsig = ?, serversig = ? where username = ? and version = ?;";
+  #iterate through sigs and update
+
+  async.each(
+    Object.keys(clientsigs)
+    (version, callback) ->
+      clientsig = clientsigs[version]
+      serversig = serversigs[version]
+
+      pool.cql cql, [clientsig, serversig, username, parseInt(version,10)], (err, results) =>
+        if err?
+          logger.error "error updating public key signatures for #{username}, version: #{version}"
+          return callback err
+        callback()
+    (err) ->
+      return callback err if err?
+      callback()
+  )
 
 
 exports.deletePublicKeys = (username, callback) ->
