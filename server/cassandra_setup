@@ -49,8 +49,7 @@ CREATE TABLE publickeys (
     dhpubsig  varchar,
     dsapub    varchar,
     dsapubsig varchar,
-    dhpubsig2  varchar,
-    dsapubsig2 varchar,
+    serversig varchar,
     clientsig varchar,
 
     PRIMARY KEY (username, version)

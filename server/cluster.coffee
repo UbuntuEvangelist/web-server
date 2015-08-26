@@ -2303,7 +2303,7 @@ else
 
         sig = req.body.clientSig
         #check sig
-        verified = verifyClientSignature username, 1, keys.dhPub, sig, keys.dsaPub
+        verified = verifyClientSignature username, 1, keys.dhPub, keys.dsaPub, sig, keys.dsaPub
 
         return res.send 400 unless verified
 
@@ -2320,7 +2320,7 @@ else
           try
             referrers = JSON.parse(req.body.referrers)
           catch error
-            logger.error "createNewUser, error: #{error}"
+            logger.error "createNewUser2, error: #{error}"
             return next error
 
 
@@ -2340,11 +2340,9 @@ else
             #protocol 2 includes username and version in signature
             vbuffer = new Buffer(4)
             vbuffer.writeInt32BE(1, 0)
-            keys.dhPubSig2 = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(keys.dhPub)).sign(serverPrivateKey, 'base64')
-            keys.dsaPubSig2 = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(keys.dsaPub)).sign(serverPrivateKey, 'base64')
+            keys.serverSig = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(keys.dhPub)).update(new Buffer(keys.dsaPub)).sign(serverPrivateKey, 'base64')
 
-
-            logger.debug "#{username}, dhPubSig: #{keys.dhPubSig}, dsaPubSig: #{keys.dsaPubSig}"
+            logger.debug "#{username}, serverSig: #{keys.serverSig}"
 
             #user id
             rc.incr "uid", (err, newid) ->
@@ -2683,7 +2681,7 @@ else
 
             #verify new client signature
             clientSig = req.body.clientSig
-            verified = verifyClientSignature username, newkv, newKeys.dhPub, clientSig, currentKeys.dsaPub
+            verified = verifyClientSignature username, newkv, newKeys.dhPub, newKeys.dsaPub, clientSig, currentKeys.dsaPub
             return res.send 403 unless verified
 
             logger.debug "client signature verified"
@@ -2701,8 +2699,7 @@ else
               #protocol v2 includes username and version in signature
               vbuffer = new Buffer(4)
               vbuffer.writeInt32BE(newkv, 0)
-              newKeys.dhPubSig2 = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(newKeys.dhPub)).sign(serverPrivateKey, 'base64')
-              newKeys.dsaPubSig2 = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(newKeys.dsaPub)).sign(serverPrivateKey, 'base64')
+              newKeys.serverSig = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(newKeys.dhPub)).update(new Buffer(newKeys.dsaPub)).sign(serverPrivateKey, 'base64')
               newKeys.clientSig = clientSig
 
               #add the keys to the key set and add revoke message in transaction
@@ -3495,12 +3492,12 @@ else
     return crypto.createVerify('sha256').update(b1).update(b2).update(random).verify(pubKey, signature)
 
 
-  verifyClientSignature = (username, version, dhPubKey, sigString, dsaSigningKey) ->
-    return false unless username?.length > 0 && version? && dhPubKey.length > 0 && sigString?.length > 0 && dsaSigningKey?.length > 0    #get the signature
+  verifyClientSignature = (username, version, dhPubKey, dsaPubKey, sigString, dsaSigningKey) ->
+    return false unless username?.length > 0 && version? && dhPubKey.length > 0 && dsaPubKey.length > 0 && sigString?.length > 0 && dsaSigningKey?.length > 0    #get the signature
     signature = new Buffer(sigString, 'base64')
     vbuffer = new Buffer(4)
     vbuffer.writeInt32BE(version, 0)
-    return crypto.createVerify('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(dhPubKey)).verify(dsaSigningKey, signature)
+    return crypto.createVerify('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(dhPubKey)).update(new Buffer(dsaPubKey)).verify(dsaSigningKey, signature)
 
 
 

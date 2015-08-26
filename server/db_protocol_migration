@@ -1,3 +1,2 @@
 ALTER TABLE publickeys ADD clientsig varchar;
-ALTER TABLE publickeys ADD dhpubsig2 varchar;
-ALTER TABLE publickeys ADD dsapubsig2 varchar;
+ALTER TABLE publickeys ADD serversig varchar;

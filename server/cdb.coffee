@@ -545,9 +545,9 @@ exports.insertPublicKeys = (username, keys, callback) ->
 
   if keys.clientSig?
 
-    insert += ",clientSig,dhPubSig2,dsaPubSig2) "
-    values += ",?,?,?);"
-    params.push keys.clientSig, keys.dhPubSig2, keys.dsaPubSig2
+    insert += ",clientSig,serverSig) "
+    values += ",?,?);"
+    params.push keys.clientSig, keys.serverSig
   else
 
     insert += ") "
@@ -579,10 +579,8 @@ exports.remapPublicKey= (results) ->
           keys['dsaPubSig'] = value
         when 'version'
           keys['version'] = "#{value}"
-        when 'dhpubsig2'
-          keys['dhPubSig2'] = value
-        when 'dsapubsig2'
-          keys['dsaPubSig2'] = value
+        when 'serversig'
+          keys['serverSig'] = value
         when 'clientsig'
           keys['clientSig'] = value
         when 'username'
@@ -609,10 +607,8 @@ exports.remapPublicKeys = (results) ->
           key['dsaPubSig'] = value
         when 'version'
           key['version'] = "#{value}"
-        when 'dhpubsig2'
-          if value? then key['dhPubSig2'] = value else return
-        when 'dsapubsig2'
-          if value? then key['dsaPubSig2'] = value else return
+        when 'serversig'
+          if value? then key['serverSig'] = value else return
         when 'clientsig'
           if value? then key['clientSig'] = value else return
         else
