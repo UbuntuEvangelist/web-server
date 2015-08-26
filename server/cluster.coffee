@@ -1768,75 +1768,80 @@ else
         logger.debug "got new user control messages: #{userControlMessages}"
         data.userControlMessages = userControlMessages
 
-      getConversationIds req.user, (err, conversationIds) ->
+      #see if they need to update sigs
+      rc.hget "u:#{username}", "sigs", (err, sigs) ->
         return next err if err?
+        data.sigs = sigs if sigs?
 
-        if not conversationIds? or conversationIds.length is 0
-          rc.hset "u:#{username}", "ac", 0, (err, result) ->
-            return next err if err?
-            return res.send data
-          return
+        getConversationIds req.user, (err, conversationIds) ->
+          return next err if err?
 
-        controlIdKeys = []
-        latestMessageIds = {}
-
-        async.each(
-          conversationIds
-          (item, callback) ->
-            controlIdKeys.push "#{item.conversation}"
-            logger.debug "setting latest message id: #{item.id} for conversation: #{item.conversation}"
-            latestMessageIds[item.conversation] = item.id
-            callback()
-          (err) ->
-            return next err if err?
-            #Get control ids
-            rc.hmget "mcmcounters", controlIdKeys, (err, rControlIds) ->
+          if not conversationIds? or conversationIds.length is 0
+            rc.hset "u:#{username}", "ac", 0, (err, result) ->
               return next err if err?
-              controlIds = {}
-              _.each(
-                rControlIds
-                (controlId, i) ->
-                  if controlId?
-                    conversation = conversationIds[i].conversation
-                    logger.debug "setting latest control id: #{controlId} for conversation: #{conversation}"
-                    controlId = parseInt(controlId, 10)
-                    controlIds[conversation] = controlId)
+              return res.send data
+            return
 
-              if Object.keys(latestMessageIds).length > 0
-                data.conversationIds = latestMessageIds
+          controlIdKeys = []
+          latestMessageIds = {}
 
-              if Object.keys(controlIds).length > 0
-                data.controlIds = controlIds
+          async.each(
+            conversationIds
+            (item, callback) ->
+              controlIdKeys.push "#{item.conversation}"
+              logger.debug "setting latest message id: #{item.id} for conversation: #{item.conversation}"
+              latestMessageIds[item.conversation] = item.id
+              callback()
+            (err) ->
+              return next err if err?
+              #Get control ids
+              rc.hmget "mcmcounters", controlIdKeys, (err, rControlIds) ->
+                return next err if err?
+                controlIds = {}
+                _.each(
+                  rControlIds
+                  (controlId, i) ->
+                    if controlId?
+                      conversation = conversationIds[i].conversation
+                      logger.debug "setting latest control id: #{controlId} for conversation: #{conversation}"
+                      controlId = parseInt(controlId, 10)
+                      controlIds[conversation] = controlId)
 
-              addNewMessages = (callback) ->
-                keys = Object.keys(spotIds)
-                if keys.length > 0
-                  messages = []
-                  #get messages
-                  async.each(
-                    keys,
-                    (spot, callback1) ->
-                      item = spotIds[spot]
-                      getMessagesAndControlMessagesOpt(username, item.u, item.m, latestMessageIds[spot], item.cm, controlIds[spot], false, (err, data) ->
-                        return callback1() if err?
-                        if data?
-                          messages.push data
-                        callback1())
-                    (err) ->
-                      if messages.length > 0
-                        data.messageData = messages
-                      callback())
-                else
-                  callback()
+                if Object.keys(latestMessageIds).length > 0
+                  data.conversationIds = latestMessageIds
 
-              addNewMessages ->
-                #clear new message counter
-                rc.hset "u:#{username}", "ac", 0, (err, result) ->
-                  return next(err) if err?
-                  sData = JSON.stringify(data)
-                  logger.debug "/optdata sending #{sData}"
-                  res.set {'Content-Type': 'application/json'}
-                  res.send data)
+                if Object.keys(controlIds).length > 0
+                  data.controlIds = controlIds
+
+                addNewMessages = (callback) ->
+                  keys = Object.keys(spotIds)
+                  if keys.length > 0
+                    messages = []
+                    #get messages
+                    async.each(
+                      keys,
+                      (spot, callback1) ->
+                        item = spotIds[spot]
+                        getMessagesAndControlMessagesOpt(username, item.u, item.m, latestMessageIds[spot], item.cm, controlIds[spot], false, (err, data) ->
+                          return callback1() if err?
+                          if data?
+                            messages.push data
+                          callback1())
+                      (err) ->
+                        if messages.length > 0
+                          data.messageData = messages
+                        callback())
+                  else
+                    callback()
+
+                addNewMessages ->
+                  #clear new message counter
+                  rc.hset "u:#{username}", "ac", 0, (err, result) ->
+                    return next(err) if err?
+                    sData = JSON.stringify(data)
+                    logger.debug "/optdata sending #{sData}"
+                    res.set {'Content-Type': 'application/json'}
+                    res.send data)
 
   #get all the data we need in one call
   app.post "/latestdata/:userControlId", ensureAuthenticated, setNoCache, (req, res, next) ->
@@ -2740,6 +2745,63 @@ else
                   return next err if err?
                   sendRevokeMessages username, kv
                   res.send 201
+
+  app.post "/sigs", ensureAuthenticated, (req,res,next) ->
+    #validate sigs against stored keys
+    return res.send 400 unless req.body?.sigs?
+    logger.debug "received sigs: #{req.body.sigs}"
+
+    sigs = JSON.parse req.body.sigs
+    username = req.user
+
+    #get all public keys
+    cdb.getPublicKeysSince username, 1, (err, keys) ->
+      return next err if err?
+      #check counts match
+
+      keyCount = keys?.length
+      return res.send 400 unless Object.keys(sigs).length is keyCount
+
+      keysObject = {}
+      async.each(
+        keys
+        (key, callback) ->
+          keysObject[parseInt(key.version,10)] = key
+          callback()
+        (err) ->
+
+          serverSigs = {}
+          #iterate through keys and check sigs
+
+          async.eachSeries(
+            keys
+            (key, callback) ->
+              version = parseInt key.version, 10
+              sig = sigs[version]
+              previousDsaKey = if version is 1 then key.dsaPub else keysObject[version-1].dsaPub
+              verified = verifyClientSignature username, version, key.dhPub, key.dsaPub, sig, previousDsaKey
+              return callback new Error 'signature check failed' unless verified
+
+              #generate server sig
+              #protocol v2 includes username and version in signature
+              vbuffer = new Buffer(4)
+              vbuffer.writeInt32BE(version, 0)
+              serverSig = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(key.dhPub)).update(new Buffer(key.dsaPub)).sign(serverPrivateKey, 'base64')
+              serverSigs[version] = serverSig
+
+
+              callback()
+            (err) ->
+              return next err if err?
+
+              #update sigs in db
+              res.send 201
+          )
+      )
+
+
+
+
 
 
   app.post "/validate", (req, res, next) ->
