@@ -2320,7 +2320,7 @@ else
         sig = req.body.clientSig
         #check sig
         verified = verifyClientSignature username, 1, keys.dhPub, keys.dsaPub, sig, keys.dsaPub
-
+        logger.debug "verify signature for username: #{username}, result: #{verified}"
         return res.send 400 unless verified
 
         #store client sig
@@ -2355,7 +2355,7 @@ else
 
             #protocol 2 includes username and version in signature
             vbuffer = new Buffer(4)
-            vbuffer.writeInt32BE(1, 0)
+            vbuffer.writeInt32LE(1, 0)
             keys.serverSig = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(keys.dhPub)).update(new Buffer(keys.dsaPub)).sign(serverPrivateKey, 'base64')
 
             logger.debug "#{username}, serverSig: #{keys.serverSig}"
@@ -2714,7 +2714,7 @@ else
 
               #protocol v2 includes username and version in signature
               vbuffer = new Buffer(4)
-              vbuffer.writeInt32BE(newkv, 0)
+              vbuffer.writeInt32LE(newkv, 0)
               newKeys.serverSig = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(newKeys.dhPub)).update(new Buffer(newKeys.dsaPub)).sign(serverPrivateKey, 'base64')
               newKeys.clientSig = clientSig
 
@@ -2798,7 +2798,7 @@ else
               #generate server sig
               #protocol v2 includes username and version in signature
               vbuffer = new Buffer(4)
-              vbuffer.writeInt32BE(version, 0)
+              vbuffer.writeInt32LE(version, 0)
               serverSig = crypto.createSign('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(key.dhPub)).update(new Buffer(key.dsaPub)).sign(serverPrivateKey, 'base64')
               serverSigs[key.version] = serverSig
 
@@ -3573,7 +3573,7 @@ else
     return false unless username?.length > 0 && version? && dhPubKey.length > 0 && dsaPubKey.length > 0 && sigString?.length > 0 && dsaSigningKey?.length > 0    #get the signature
     signature = new Buffer(sigString, 'base64')
     vbuffer = new Buffer(4)
-    vbuffer.writeInt32BE(version, 0)
+    vbuffer.writeInt32LE(version, 0)
     return crypto.createVerify('sha256').update(new Buffer(username)).update(vbuffer).update(new Buffer(dhPubKey)).update(new Buffer(dsaPubKey)).verify(dsaSigningKey, signature)
 
 
