@@ -311,9 +311,9 @@ else
     app.set 'views', "#{__dirname}/views"
     app.set 'view engine', 'jade'
 
-    app.use(require('express-bunyan-logger')({name: 'surespot', streams : bunyanStreams }));
+    #app.use(require('express-bunyan-logger')({name: 'surespot', streams : bunyanStreams }));
     app.use app.router
-    app.use(require('express-bunyan-logger').errorLogger({name: 'surespot', streams : bunyanStreams }));
+    #app.use(require('express-bunyan-logger').errorLogger({name: 'surespot', streams : bunyanStreams }));
     app.use (err, req, res, next) ->
       res.send err.status or 500
 
@@ -2532,7 +2532,6 @@ else
           rc.set "kt:#{username}", token, (err, result) ->
             return next err if err?
             res.send {keyversion: kv, token: token}
-
 
   app.post "/keys", (req, res, next) ->
     logger.debug "/keys"
