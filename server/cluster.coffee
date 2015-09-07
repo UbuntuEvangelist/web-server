@@ -3499,11 +3499,13 @@ else
                       cdb.deleteAllControlMessages room, (err, results) ->
                         logger.error "Could not delete spot #{room} control messages" if err?
                         logger.debug "deleteAllControlMessages completed"
+
                       #delete counters
-                      multi.hdel "mcmcounters",room
+                      #TODO remove when cassandra bug fixed
+                      #multi.hdel "mcmcounters",room
 
                       #remove message counters for the conversation
-                      multi.hdel "mcounters", room
+                      #multi.hdel "mcounters", room
 
                       #remove them from my deleted set
                       multi.srem "ud:#{username}", theirUsername
