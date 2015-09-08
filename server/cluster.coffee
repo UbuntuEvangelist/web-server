@@ -951,7 +951,7 @@ else
 
             #if to user not connected, increment activity count
             roomCount = sio.sockets.clients(to).length
-            logger.info "room clients for #{to}, #{roomCount}"
+            logger.debug "room clients for #{to}, #{roomCount}"
             if roomCount is 0
               #increment new message count
               multi.hincrby "u:#{to}", "ac", 1
@@ -1015,7 +1015,7 @@ else
                   message.deleteControlMessages = theirDeleteControlMessages
                 theirMessage = JSON.stringify message
 
-                logger.info "#{message.id}: #{from}->#{to}, mimeType: #{mimeType}"
+                logger.debug "#{message.id}: #{from}->#{to}, mimeType: #{mimeType}"
 
                 sio.sockets.to(to).emit "message", theirMessage
                 sio.sockets.to(from).emit "message", myMessage
@@ -1275,14 +1275,14 @@ else
 
   sio.on "connection", (socket) ->
     user = socket.handshake.session.passport.user
-    logger.info "#{user} connected"
+    logger.debug "#{user} connected"
 
     socket.join user
 
     socket.on "message", (data) -> handleMessages socket, user, data
     socket.on "disconnect", ->
       socket.leave user
-      logger.info "#{user} disconnected"
+      logger.debug "#{user} disconnected"
 
 
 
@@ -2759,7 +2759,7 @@ else
   app.post "/sigs", ensureAuthenticated, (req,res,next) ->
 
     return res.send 400 unless req.body?.sigs?
-    logger.debug "received sigs: #{req.body.sigs}"
+    logger.info "received sigs: #{req.body.sigs}"
 
     clientsigs = JSON.parse req.body.sigs
     username = req.user
@@ -2790,10 +2790,12 @@ else
               clientsig = clientsigs[key.version]
               previousDsaKey = if version is 1 then key.dsaPub else keysObject[version-1].dsaPub
 
+              logger.info "verifying client sig"
               #validate sigs against stored keys
               verified = verifyClientSignature username, version, key.dhPub, key.dsaPub, clientsig, previousDsaKey
               return callback new Error 'signature check failed' unless verified
 
+              logger.info "client sig verified"
               #generate server sig
               #protocol v2 includes username and version in signature
               vbuffer = new Buffer(4)
@@ -2839,7 +2841,7 @@ else
     return callback null, false unless friendname?
     #keep running count of autoinvites
     if source?
-      logger.info "#{username} invited #{friendname} via #{source}"
+      logger.debug "#{username} invited #{friendname} via #{source}"
       rc.hincrby "ai", source, 1
 
 
@@ -2850,7 +2852,7 @@ else
     multi.sadd "ir:#{friendname}", username
     #add one to activity count if user not connected
     roomCount = sio.sockets.clients(friendname).length
-    logger.info "room clients for #{friendname}, #{roomCount}"
+    logger.debug "room clients for #{friendname}, #{roomCount}"
     if roomCount is 0
       #increment new message count
       multi.hincrby "u:#{friendname}", "ac", 1
@@ -3069,7 +3071,7 @@ else
     friendname = req.params.username
     action = req.params.action
 
-    logger.info "#{username} #{action} #{friendname}"
+    logger.debug "#{username} #{action} #{friendname}"
 
     #make sure invite exists
     inviteExists friendname, username, (err, result) ->
@@ -3086,7 +3088,7 @@ else
               process.nextTick ->
                 #increment activity counter if not currently connected
                 roomCount = sio.sockets.clients(friendname).length
-                logger.info "room clients for #{friendname}, #{roomCount}"
+                logger.debug "room clients for #{friendname}, #{roomCount}"
                 if roomCount is 0
                   #increment new message count
                   rc.hincrby "u:#{friendname}", "ac", 1, (err, result) ->
@@ -3519,7 +3521,7 @@ else
 
 
   app.post "/logout", ensureAuthenticated, (req, res) ->
-    logger.info "#{req.user} logged out"
+    logger.debug "#{req.user} logged out"
     req.logout()
     req.session?.destroy()
     res.send 204
