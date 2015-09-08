@@ -581,9 +581,9 @@ exports.remapPublicKey= (results) ->
         when 'version'
           keys['version'] = "#{value}"
         when 'serversig'
-          if value? then key['serverSig'] = value else return
+          if value? then keys['serverSig'] = value else return
         when 'clientsig'
-          if value? then key['clientSig'] = value else return
+          if value? then keys['clientSig'] = value else return
         when 'username'
           return
         else
