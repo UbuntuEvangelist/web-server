@@ -1,2 +1,3 @@
-ALTER TABLE publickeys ADD clientsig varchar;
-ALTER TABLE publickeys ADD serversig varchar;
+ALTER TABLE chatmessages ADD hashed boolean;
+ALTER TABLE frienddata ADD aliashashed boolean;
+ALTER TABLE frienddata ADD imagehashed boolean;

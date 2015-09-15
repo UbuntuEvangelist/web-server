@@ -886,7 +886,7 @@ else
     messageError.status = status
     return messageError
 
-  createAndSendMessage = (from, fromVersion, to, toVersion, iv, data, mimeType, id, dataSize, time, resendId, callback) ->
+  createAndSendMessage = (from, fromVersion, to, toVersion, iv, data, mimeType, id, dataSize, time, resendId, hashed, callback) ->
     message = {}
     message.to = to
     message.from = from
@@ -897,6 +897,8 @@ else
     message.data = data
     message.mimeType = mimeType
     message.dataSize = dataSize if dataSize
+    message.hashed = hashed
+
     room = common.getSpotName(from,to)
 
     #INCR message id
@@ -1249,6 +1251,7 @@ else
     return callback new MessageError(iv, 400) unless toVersion?
     fromVersion = message.fromVersion
     return callback new MessageError(iv, 400) unless fromVersion?
+    hashed = message.hashed
 
 
     #if this message isn't from the logged in user we have problems
@@ -1270,7 +1273,7 @@ else
 
             resendId = message.resendId
 
-            createAndSendMessage from, fromVersion, to, toVersion, iv, cipherdata, "text/plain", null, null, Date.now(), resendId, callback
+            createAndSendMessage from, fromVersion, to, toVersion, iv, cipherdata, "text/plain", null, null, Date.now(), resendId, hashed, callback
 
 
   sio.on "connection", (socket) ->
@@ -1486,6 +1489,11 @@ else
         res.send newStatus
 
   app.put "/users/:username/alias", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
+    assignFriendAlias false, req, res, next
+  app.put "/users/:username/alias2", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
+    assignFriendAlias true, req, res, next
+
+  assignFriendAlias = (hashed, req, res, next) ->
 
     username = req.user
     friendname = req.params.username
@@ -1496,9 +1504,9 @@ else
     iv = req.body.iv
     return res.send 400 unless iv?
 
-    cdb.insertFriendAliasData username, friendname, data, version, iv, (err, results) ->
+    cdb.insertFriendAliasData username, friendname, data, version, iv, hashed, (err, results) ->
       return next err if err?
-      createAndSendUserControlMessage username, "friendAlias", friendname, { data: data, iv: iv, version: version }, (err) ->
+      createAndSendUserControlMessage username, "friendAlias", friendname, { data: data, iv: iv, version: version, aliasHashed: hashed }, (err) ->
         if err?
           logger.error "#{username} /users/#{friendname}/alias/#{version}, error creating and sending user control message: #{err}"
         res.send 204
@@ -1529,6 +1537,12 @@ else
         res.send 204
 
   app.post "/images/:username/:version", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
+    assignFriendImage false, req, res, next
+
+  app.post "/images2/:username/:version", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
+    assignFriendImage true, req, res, next
+
+  assignFriendImage = (hashed, req, res, next) ->
 
     username = req.user
     otherUser = req.params.username
@@ -1577,13 +1591,13 @@ else
                 deleteFile friend.imageUrl, "image/"
 
 
-            cdb.insertFriendImageData username, otherUser, url, version, iv, (err, results) ->
+            cdb.insertFriendImageData username, otherUser, url, version, iv, hashed, (err, results) ->
               if err?
                 logger.error "POST /images/#{username}/#{version}, error: #{err}"
                 deleteFile url, "image/"
                 return next err
 
-              createAndSendUserControlMessage username, "friendImage", otherUser, { url: url, iv: iv, version: version }, (err) ->
+              createAndSendUserControlMessage username, "friendImage", otherUser, { url: url, iv: iv, version: version, imageHashed: hashed }, (err) ->
                 if err?
                   logger.error "POST /images/:username/:version, error: #{err}"
                   deleteFile url, "image/"
@@ -1596,8 +1610,16 @@ else
 
     form.parse req
 
+
   #doing more than images now, don't feel like changing the api though..yet
   app.post "/images/:fromversion/:username/:toversion", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
+    sendImage false, req, res, next
+
+  app.post "/images2/:fromversion/:username/:toversion", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
+    sendImage true, req, res, next
+
+  sendImage = (hashed, req, res, next) ->
+
     #upload image to rackspace then create a message with the image url and send it to chat recipients
     username = req.user
     path = null
@@ -1692,7 +1714,7 @@ else
               url = cdn + "/#{path}"
 
               time = Date.now()
-              createAndSendMessage req.user, req.params.fromversion, req.params.username, req.params.toversion, part.filename, url, mimeType, id, size, time, null, (err) ->
+              createAndSendMessage req.user, req.params.fromversion, req.params.username, req.params.toversion, part.filename, url, mimeType, id, size, time, null, hashed, (err) ->
                 logger.error "error sending message on socket: #{err}" if err?
                 return next err if err?
                 res.send { id: id, url: url, time: time, size: size}

@@ -6,7 +6,7 @@ exports.getOtherSpotUser = (spot, user) ->
   users = spot.split ":"
   if user == users[0] then return users[1] else return users[0]
 
-exports.Friend = (name, flags, imageUrl, imageVersion, imageIv, aliasData, aliasVersion, aliasIv) ->
+exports.Friend = (name, flags, imageUrl, imageVersion, imageIv, aliasData, aliasVersion, aliasIv, aliasHashed, imageHashed) ->
   friend = {}
   friend.flags = flags
 
@@ -30,6 +30,13 @@ exports.Friend = (name, flags, imageUrl, imageVersion, imageIv, aliasData, alias
 
   if aliasIv
     friend.aliasIv = aliasIv
+
+  if aliasHashed
+    friend.aliasHashed = aliasHashed
+
+  if imageHashed
+    friend.imageHashed = imageHashed
+
 
   return friend
 

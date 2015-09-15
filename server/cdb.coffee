@@ -50,7 +50,8 @@ exports.insertMessage = (message, callback) ->
     message.toVersion,
     message.iv,
     message.data,
-    message.mimeType]
+    message.mimeType,
+    message.hashed]
 
   params2 = [
     message.from,
@@ -63,11 +64,12 @@ exports.insertMessage = (message, callback) ->
     message.toVersion,
     message.iv,
     message.data,
-    message.mimeType]
+    message.mimeType,
+    message.hashed]
 
 
-  insert = " INSERT INTO chatmessages (username, spotname, id, datetime, fromuser, fromversion, touser, toversion, iv, data, mimeType"
-  values = " VALUES (?, ?, ?, ?, ?,?,?,?,?,?,?"
+  insert = " INSERT INTO chatmessages (username, spotname, id, datetime, fromuser, fromversion, touser, toversion, iv, data, mimeType, hashed"
+  values = " VALUES (?, ?, ?, ?, ?,?,?,?,?,?,?,?"
   if message.dataSize?
     insert += ", datasize) "
     values += ", ?) "
@@ -667,11 +669,11 @@ exports.deletePublicKeys = (username, callback) ->
 
 
 #friend data
-exports.insertFriendImageData = (username, friendname, url, version, iv, callback) ->
+exports.insertFriendImageData = (username, friendname, url, version, iv, hashed, callback) ->
   if username? and friendname? and url? and version? and iv?
     cql =
-      "INSERT INTO frienddata (username, friendname, imageUrl, imageVersion, imageIv)
-                   VALUES (?,?,?,?,?);"
+      "INSERT INTO frienddata (username, friendname, imageUrl, imageVersion, imageIv, imageHashed)
+                   VALUES (?,?,?,?,?,?);"
 
     #logger.debug "sending cql #{cql}"
 
@@ -680,7 +682,8 @@ exports.insertFriendImageData = (username, friendname, url, version, iv, callbac
       friendname,
       url,
       version,
-      iv
+      iv,
+      hashed
     ], (err, results) ->
       if err?
         logger.error "error inserting friend image data for username: #{username}, friendname: #{friendname}"
@@ -688,12 +691,12 @@ exports.insertFriendImageData = (username, friendname, url, version, iv, callbac
   else
     callback()
 
-exports.insertFriendAliasData = (username, friendname, data, version, iv, callback) ->
+exports.insertFriendAliasData = (username, friendname, data, version, iv, hashed, callback) ->
 
   if username? and friendname? and data? and version? and iv?
     cql =
-      "INSERT INTO frienddata (username, friendname, aliasData, aliasVersion, aliasIv)
-                   VALUES (?,?,?,?,?);"
+      "INSERT INTO frienddata (username, friendname, aliasData, aliasVersion, aliasIv, aliasHashed)
+                   VALUES (?,?,?,?,?,?);"
 
     #logger.debug "sending cql #{cql}"
 
@@ -702,7 +705,8 @@ exports.insertFriendAliasData = (username, friendname, data, version, iv, callba
       friendname,
       data,
       version,
-      iv
+      iv,
+      hashed
     ], (err, results) ->
       if err?
         logger.error "error inserting friend alias data for username: #{username}, friendname: #{friendname}"
@@ -775,6 +779,12 @@ exports.remapFriendData = (row) ->
       when 'aliasiv'
         if value?
           friend['aliasIv'] = value
+      when 'imagehashed'
+        if value?
+          friend['imageHashed'] = value
+      when 'aliashashed'
+        if value?
+          friend['aliasHashed'] = value
 
       else
         return
@@ -808,6 +818,12 @@ exports.remapFriendDatas = (results) ->
         when 'aliasiv'
           if value?
             friend['aliasIv'] = value
+        when 'imagehashed'
+          if value?
+            friend['imageHashed'] = value
+        when 'aliashashed'
+          if value?
+            friend['aliasHashed'] = value
 
         else
           return
@@ -856,105 +872,3 @@ exports.insertYourmama = (ymis, time, callback) ->
     callback(err,results)
 
 
-
-#migration crap
-exports.migrateInsertMessage = (message, callback) ->
-  logger.debug "insertMessage id: #{message.id}"
-  spot = common.getSpotName(message.from, message.to)
-
-  cql =
-    "BEGIN BATCH
-      INSERT INTO chatmessages (username, spotname, id, datetime, fromuser, fromversion, touser, toversion, iv, data, mimeType, datasize, shareable)
-      VALUES (?, ?, ?, ?, ?,?,?,?,?,?,?,?,? )
-      INSERT INTO chatmessages (username, spotname, id, datetime, fromuser, fromversion, touser, toversion, iv, data, mimeType, datasize, shareable)
-      VALUES (?, ?, ?, ?, ?,?,?,?,?,?,?,?,? )
-      APPLY BATCH"
-
-
-
-  pool.cql cql, [
-    message.to,
-    spot,
-    message.id,
-    message.datetime,
-    message.from,
-    message.fromVersion,
-    message.to,
-    message.toVersion,
-    message.iv,
-    message.data,
-    message.mimeType,
-    message.dataSize,
-    message.shareable,
-
-    message.from,
-    spot,
-    message.id,
-    message.datetime,
-    message.from,
-    message.fromVersion,
-    message.to,
-    message.toVersion,
-    message.iv,
-    message.data,
-    message.mimeType,
-    message.dataSize,
-    message.shareable,
-  ], callback
-
-
-
-exports.migrateDeleteMessages = (username, spot, messageIds, callback) ->
-  params = []
-  logger.debug "deleting #{username} #{spot}"
-
-  #delete all username's messages for the other user where ids match
-  # add delete statements for my messages in their chat table because we can't use in with ids, or equal with fromuser which can't be in the primary key because it fucks up the other queries
-  #https://issues.apache.org/jira/browse/CASSANDRA-6173
-  #cheesy as fuck but it'll do for now until we can delete by secondary columns or use < >, or even IN with primary key columns
-  cql = "begin batch "
-
-  for id in messageIds
-    cql += "delete from chatmessages where username=? and spotname=? and id = ? "
-    params = params.concat([username, spot, parseInt(id)])
-
-  cql += "apply batch"
-
-  #logger.debug "sending cql: #{cql}"
-  #logger.debug "params: #{JSON.stringify(params)}"
-  pool.cql cql, params, (err, results) ->
-    logger.debug "err: #{err}" if err?
-    logger.debug "results: #{results}"
-    callback err, results
-
-exports.migrateInsertPublicKeys = (username, keys, callback) ->
-  cql =
-    "INSERT INTO publickeys (username, version, dhPub, dhPubSig, dsaPub, dsaPubSig)
-             VALUES (?,?,?,?,?,?);"
-
-  #logger.debug "sending cql #{cql}"
-
-  pool.cql cql, [
-    username,
-    parseInt(keys.version),
-    keys.dhPub,
-    keys.dhPubSig,
-    keys.dsaPub,
-    keys.dsaPubSig
-  ], callback
-
-exports.migrateInsertFriendImageData = (username, friendname, key, value, callback) ->
-
-  cql =
-    "INSERT INTO frienddata (username, friendname, #{key}) VALUES (?,?,?);"
-
-  #logger.debug "sending cql #{cql}"
-
-  pool.cql cql, [
-    username,
-    friendname,
-    value
-  ], (err, results) ->
-    if err?
-      logger.error "error inserting friend image data for username: #{username}, friendname: #{friendname}"
-    callback(err,results)
