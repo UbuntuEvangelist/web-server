@@ -1026,73 +1026,121 @@ else
                   sendPushMessage message, theirMessage
                 callback()
 
+  migratePushTokens = (username, gcmIds, apnTokens, callback) ->
+    if gcmIds? or apnTokens?
+      multi = rc.multi()
+
+      logger.debug "migrating push tokens for user #{username}, hasGcms: #{gcmIds?}, hasApns: #{apnTokens?}"
+      if gcmIds?
+
+        #add gcm ids to a set
+        gcm_ids = gcmIds.split(":")
+        _.each(
+          gcm_ids,
+          (gcmId) -> multi.sadd "gcm:#{username}", gcmId
+        )
+
+        #delete hashed value
+        multi.hdel "u:#{username}", "gcmId"
+
+      if apnTokens?
+
+        apn_tokens = apnTokens.split(":")
+        _.each(
+          apn_tokens
+          (token) -> multi.sadd "apn:#{username}", token
+        )
+
+        multi.hdel "u:#{username}", "apnToken"
+
+      multi.exec callback
+    else
+      callback()
+
+  getPushTokens = (username, callback) ->
+    rc.smembers "gcm:#{username}", (err, gcmIds) ->
+      return callback err if err?
+      rc.smembers "apn:#{username}", (err, apnTokens) ->
+        return callback err if err?
+        callback null, gcmIds, apnTokens
 
   sendPushMessage = (message, messagejson) ->
     #send gcm message
-    userKey = "u:" + message.to
+    username = message.to
+    userKey = "u:#{username}"
     rc.hmget userKey, ["gcmId", "apnToken", "ac"], (err, ids) ->
       if err?
-        logger.error "error getting push ids for user: #{message.to}, error: #{err}"
+        logger.error "error getting activity counts for user: #{username}, error: #{err}"
         return
 
-      gcmIds = ids[0]?.split(":")
-      apn_tokens = ids[1]?.split(":")
-      if gcmIds?.length > 0
-        logger.debug "sending gcms for message"
-        gcmmessage = new gcm.Message()
-        logger.debug "gcm message created"
-        sender = new gcm.Sender("#{googleApiKey}",  {maxSockets: MAX_GCM_SOCKETS})
-        logger.debug "gcm sender created"
-        gcmmessage.addData("type", "message")
-        gcmmessage.addData("to", message.to)
-        gcmmessage.addData("sentfrom", message.from)
-        gcmmessage.addData("mimeType", message.mimeType)
-        #pop entire message into gcm message if it's small enough
-        if messagejson.length <= 3800
-          gcmmessage.addData("message", messagejson)
+      #migrate to sets
+      migratePushTokens username, ids[0], ids[1],  (err) ->
+        if err?
+          logger.error "error migrating push tokens for user: #{username}, error: #{err}"
+          return
 
-        gcmmessage.delayWhileIdle = false
-        gcmmessage.timeToLive = GCM_TTL
+        getPushTokens username, (err, gcmIds, apn_tokens) ->
+          if err?
+            logger.error "error getting push tokens for user: #{username}, error: #{err}"
+            return
 
-        logger.debug "gcm data set"
 
-        logger.debug "sending push messages to: #{ids[0]}"
-        sender.send gcmmessage, gcmIds, GCM_RETRIES, (err, result) ->
-          return logger.error "Error sending message gcm from: #{message.from}, to: #{message.to}: #{err}" if err? or not result?
-          logger.debug "sendGcm result: #{JSON.stringify(result)}"
+          if gcmIds?.length > 0
+            logger.debug "sending gcms for message"
+            gcmmessage = new gcm.Message()
+            logger.debug "gcm message created"
+            sender = new gcm.Sender("#{googleApiKey}",  {maxSockets: MAX_GCM_SOCKETS})
+            logger.debug "gcm sender created"
+            gcmmessage.addData("type", "message")
+            gcmmessage.addData("to", message.to)
+            gcmmessage.addData("sentfrom", message.from)
+            gcmmessage.addData("mimeType", message.mimeType)
+            #pop entire message into gcm message if it's small enough
+            if messagejson.length <= 3800
+              gcmmessage.addData("message", messagejson)
 
-          if result.failure > 0
-            removeGcmIds message.to, gcmIds, result.results
+            gcmmessage.delayWhileIdle = false
+            gcmmessage.timeToLive = GCM_TTL
 
-          if result.canonical_ids > 0
-            handleCanonicalIds message.to, gcmIds, result.results
-      else
-        logger.debug "no gcm id for #{message.to}"
+            logger.debug "gcm data set"
 
-      if apn_tokens?.length > 0
-        logger.debug "sending apns for message"
-        async.each(
-          apn_tokens,
-          (token, callback) ->
-            apnDevice = new apn.Device token
-            note = new apn.Notification()
-            #apns are only 256 chars so we can't send the message
+            logger.debug "sending push messages to: #{ids[0]}"
+            sender.send gcmmessage, [gcmIds], GCM_RETRIES, (err, result) ->
+              return logger.error "Error sending message gcm from: #{message.from}, to: #{message.to}: #{err}" if err? or not result?
+              logger.debug "sendGcm result: #{JSON.stringify(result)}"
 
-            badgeNum = parseInt ids[2]
-            badgeNum = if isNaN(badgeNum) then 0 else badgeNum
+              if result.failure > 0
+                removeGcmIds message.to, gcmIds, result.results
 
-            note.badge = badgeNum
-            note.alert = { "loc-key": "notification_message", "loc-args": [message.to, message.from] }
-            note.payload = { id:message.id }
-            note.sound = "message.caf"
-            logger.debug "sending apn to token: #{token} for #{message.to}"
-            apnConnection.pushNotification note, apnDevice
-            callback()
-          (err) ->
-            logger.error "error sending message apns: #{err}" if err?
-        )
-      else
-        logger.debug "no apn tokens for #{message.to}"
+              if result.canonical_ids > 0
+                handleCanonicalIds message.to, gcmIds, result.results
+          else
+            logger.debug "no gcm id for #{message.to}"
+
+          if apn_tokens?.length > 0
+            logger.debug "sending apns for message"
+            async.each(
+              apn_tokens,
+              (token, callback) ->
+                apnDevice = new apn.Device token
+                note = new apn.Notification()
+                #apns are only 256 chars so we can't send the message
+
+                badgeNum = parseInt ids[2]
+                badgeNum = if isNaN(badgeNum) then 0 else badgeNum
+
+                note.badge = badgeNum
+                note.alert = { "loc-key": "notification_message", "loc-args": [message.to, message.from] }
+                note.payload = { id:message.id }
+                note.sound = "message.caf"
+                logger.debug "sending apn to token: #{token} for #{message.to}"
+                apnConnection.pushNotification note, apnDevice
+                callback()
+              (err) ->
+                logger.error "error sending message apns: #{err}" if err?
+            )
+          else
+            logger.debug "no apn tokens for #{message.to}"
 
   getMessagePointerData = (from, messagePointer) ->
     #delete message
@@ -2252,9 +2300,6 @@ else
 
         return next new Error('auth signature required') unless req.body?.authSig?
 
-        if req.body?.gcmId?
-          user.gcmId = req.body.gcmId
-
 
         referrers = null
 
@@ -2265,8 +2310,6 @@ else
             logger.error "createNewUser, error: #{error}"
             return next error
 
-
-        logger.debug "gcmID: #{user.gcmId}"
         logger.debug "referrers: #{req.body.referrers}"
 
         bcrypt.genSalt 10, 32, (err, salt) ->
@@ -2291,6 +2334,14 @@ else
                 multi = rc.multi()
                 multi.hmset "u:#{username}", user
                 multi.sadd "u", username
+
+                if req.body?.gcmId?
+                  logger.debug "gcmID: #{req.body.gcmId}"
+                  multi.sadd "gcm:#{username}", req.body.gcmId
+                if req.body?.apnToken?
+                  logger.debug "apnToken: #{req.body.apnToken}"
+                  multi.sadd "apn:#{username}", req.body.apnToken
+
                 multi.exec (err,replies) ->
                   return next err if err?
                   logger.warn "#{username} created, uid: #{user.id}, platform: #{platform}, version: #{version}"
@@ -2348,12 +2399,7 @@ else
         #store client sig
         keys.clientSig = sig
 
-        if req.body?.gcmId?
-          user.gcmId = req.body.gcmId
-
-
         referrers = null
-
         if req.body?.referrers?
           try
             referrers = JSON.parse(req.body.referrers)
@@ -2362,7 +2408,7 @@ else
             return next error
 
 
-        logger.debug "gcmID: #{user.gcmId}"
+
         logger.debug "referrers: #{req.body.referrers}"
 
         bcrypt.genSalt 10, 32, (err, salt) ->
@@ -2393,6 +2439,14 @@ else
                 multi = rc.multi()
                 multi.hmset "u:#{username}", user
                 multi.sadd "u", username
+                if req.body?.gcmId?
+                  logger.debug "gcmID: #{req.body.gcmId}"
+                  multi.sadd "gcm:#{username}", req.body.gcmId
+                if req.body?.apnToken?
+                  logger.debug "apnToken: #{req.body.apnToken}"
+                  multi.sadd "apn:#{username}", req.body.apnToken
+
+
                 multi.exec (err,replies) ->
                   return next err if err?
                   logger.warn "#{username} created, uid: #{user.id}, platform: #{platform}, version: #{version}"
@@ -2434,9 +2488,7 @@ else
 
 
   updatePushIds = (req, res, next) ->
-    #add push id
-
-    #ids colon delimited
+    #add push id to sets
 
     gcmId = req.body.gcmId
     apnToken = req.body.apnToken
@@ -2446,62 +2498,34 @@ else
     return next() unless gcmId? or apnToken?
 
     username = req.user
+    multi = rc.multi()
+    if gcmId?
+      multi.sadd "gcm:#{username}", gcmId
 
-    userKey = "u:" + username
-    rcs.hgetall userKey, (err, user) ->
-      return next() if err?
+    if apnToken?
 
-      updateGcmId = (callback) ->
-        return callback() unless gcmId?
+      rc.hget "apnMap", apnToken, (err, usernameData) ->
+        return next() if err?
+        usernameList = usernameData
 
-        gcmIds = user.gcmId?.split(":") ? []
-        #if it's not in the list, add it
-        if (gcmIds.indexOf(gcmId) is -1)
-
-          gcmIds.push gcmId
-          newIds =  gcmIds.filter((n) -> return n?.length > 0).join(":")
-          logger.debug "adding gcm id #{gcmId} for #{username}, new list: #{newIds}"
-          rc.hset userKey, 'gcmId', newIds, (err, result) ->
-            logger.error "error setting gcmId for #{username}" if err?
-            callback()
+        #if we have a current mapping and the username is not in the list, add it
+        if usernameData?
+          usernames = usernameData.split(":")
+          if (usernames.indexOf(username) is -1)
+            usernames.push username
+            usernameList = usernames.filter((n) -> return n?.length > 0).join(":")
         else
-          callback()
+          usernameList = username
 
-      updateGcmId ->
-        return next() unless apnToken?
-
-        apnTokens = user.apnToken?.split(":") ? []
-        #if it's not in the list, add it
-        if (apnTokens.indexOf(apnToken) is -1)
-          apnTokens.push apnToken
-          newTokens =  apnTokens.filter((n) -> return n?.length > 0).join(":")
-          logger.debug "adding apn token #{apnToken} for #{username}, new list: #{newTokens}"
-          #save mapping from token to username(s) so we can remove it if we get feedback
-
-          #get the current mapping
-          rc.hget "apnMap", apnToken, (err, usernameData) ->
-            return next() if err?
-            usernameList = usernameData
-
-            #if we have a current mapping and the username is not in the list, add it
-            if usernameData?
-              usernames = usernameData.split(":")
-              if (usernames.indexOf(username) is -1)
-                usernames.push username
-                usernameList = usernames.filter((n) -> return n?.length > 0).join(":")
-            else
-              usernameList = username
-
-            logger.debug "setting map for apn token #{apnToken} to #{usernameList}"
-            multi = rc.multi()
-            multi.hset "apnMap", apnToken, usernameList
-            multi.hset userKey, 'apnToken', newTokens
-            multi.exec (err, results) ->
-              logger.error "error setting apn tokens for user #{username}: #{err}" if err?
-              next()
-        else
+        logger.debug "setting map for apn token #{apnToken} to #{usernameList}"
+        multi.hset "apnMap", apnToken, usernameList
+        multi.sadd "apn:#{username}", apnToken
+        multi.exec (err, results) ->
+          logger.error "error setting apn tokes for user #{username}: #{err}" if err?
           next()
-
+    else
+      multi.exec (err) ->
+        next()
 
   app.post "/users",
     validateVersion,
@@ -2631,23 +2655,16 @@ else
 
                 if gcmId?
                   logger.debug "setting gcmid and removing apnToken for #{username}"
-                  multi.hset userKey, "gcmId", gcmId
-                  multi.hdel userKey, "apnToken"
+                  multi.del "gcm:#{username}"
+                  multi.sadd "gcm:#{username}", gcmId
+                  multi.del "apn:#{username}"
                 else
                   apnToken = req.body.apnToken
                   if apnToken?
                     logger.debug "setting apnToken and removing gcmId for #{username}"
-                    multi.hset userKey, "apnToken", apnToken
-                    multi.hdel userKey, "gcmId"
-                  else
-                    #if we were not sent the id by a recent version, blow it away
-                    #todo remove this check once we are restricting versions
-                    version = req.body.version
-                    if version?
-                      logger.debug "keys regenerated by client that knows to send version (#{version}), removing gcmid and apnToken from #{username}"
-                      multi.hdel userKey, "gcmId"
-                      multi.hdel userKey, "apnToken"
-
+                    multi.del "gcm:#{username}"
+                    multi.del "apn:#{username}"
+                    multi.sadd "apn:#{username}", apnToken
 
                 #send revoke message
                 multi.exec (err, replies) ->
@@ -2754,23 +2771,16 @@ else
 
                 if gcmId?
                   logger.debug "setting gcmid and removing apnToken for #{username}"
-                  multi.hset userKey, "gcmId", gcmId
-                  multi.hdel userKey, "apnToken"
+                  multi.del "gcm:#{username}"
+                  multi.sadd "gcm:#{username}", gcmId
+                  multi.del "apn:#{username}"
                 else
                   apnToken = req.body.apnToken
                   if apnToken?
                     logger.debug "setting apnToken and removing gcmId for #{username}"
-                    multi.hset userKey, "apnToken", apnToken
-                    multi.hdel userKey, "gcmId"
-                  else
-                    #if we were not sent the id by a recent version, blow it away
-                    #todo remove this check once we are restricting versions
-                    version = req.body.version
-                    if version?
-                      logger.debug "keys regenerated by client that knows to send version (#{version}), removing gcmid and apnToken from #{username}"
-                      multi.hdel userKey, "gcmId"
-                      multi.hdel userKey, "apnToken"
-
+                    multi.del "gcm:#{username}"
+                    multi.del "apn:#{username}"
+                    multi.sadd "apn:#{username}", apnToken
 
                 #send revoke message
                 multi.exec (err, replies) ->
@@ -2903,54 +2913,63 @@ else
         logger.error "inviteUser, " + err
         return
 
-      gcmIds = ids[0]?.split(":")
-      apn_tokens = ids[1]?.split(":")
+      #migrate to sets
+      migratePushTokens username, ids[0], ids[1],  (err) ->
+        if err?
+          logger.error "error migrating push tokens for user: #{username}, error: #{err}"
+          return
 
-      if gcmIds?.length > 0
-        logger.debug "sending gcms for invite"
-        gcmmessage = new gcm.Message()
-        sender = new gcm.Sender("#{googleApiKey}", {maxSockets: MAX_GCM_SOCKETS})
-        gcmmessage.addData "type", "invite"
-        gcmmessage.addData "sentfrom", username
-        gcmmessage.addData "to", friendname
-        gcmmessage.delayWhileIdle = false
-        gcmmessage.timeToLive = GCM_TTL
-        #gcmmessage.collapseKey = "invite:#{friendname}"
-
-        sender.send gcmmessage, gcmIds, GCM_RETRIES, (err, result) ->
-          return logger.error "Error sending invite gcm from: #{username}, to: #{friendname}: #{err}" if err? or not result?
-          logger.debug "sent gcm for invite: #{JSON.stringify(result)}"
-          if result.failure > 0
-            removeGcmIds friendname, gcmIds, result.results
-
-          if result.canonical_ids > 0
-            handleCanonicalIds friendname, gcmIds, result.results
-      else
-        logger.debug "gcmIds not set for #{friendname}"
-
-      if apn_tokens?.length > 0
-        logger.debug "sending apns for invite"
-        async.each(
-          apn_tokens,
-          (token, callback) ->
-            apnDevice = new apn.Device token
-            note = new apn.Notification()
-
-            badgeNum = parseInt ids[2]
-            badgeNum = if isNaN(badgeNum) then 0 else badgeNum
-
-            note.badge = badgeNum
-            note.sound = "surespot-invite.caf"
-            note.alert = { "loc-key": "notification_invite", "loc-args": [friendname, username] }
-            apnConnection.pushNotification note, apnDevice
-            callback()
-          (err) ->
-            logger.error "error sending invite apns: #{err}" if err?
-        )
+        getPushTokens username, (err, gcmIds, apn_tokens) ->
+          if err?
+            logger.error "error getting push tokens for user: #{username}, error: #{err}"
+            return
 
 
-      else
-        logger.debug "no apn tokens for #{friendname}"
+          if gcmIds?.length > 0
+            logger.debug "sending gcms for invite"
+            gcmmessage = new gcm.Message()
+            sender = new gcm.Sender("#{googleApiKey}", {maxSockets: MAX_GCM_SOCKETS})
+            gcmmessage.addData "type", "invite"
+            gcmmessage.addData "sentfrom", username
+            gcmmessage.addData "to", friendname
+            gcmmessage.delayWhileIdle = false
+            gcmmessage.timeToLive = GCM_TTL
+            #gcmmessage.collapseKey = "invite:#{friendname}"
+
+            sender.send gcmmessage, gcmIds, GCM_RETRIES, (err, result) ->
+              return logger.error "Error sending invite gcm from: #{username}, to: #{friendname}: #{err}" if err? or not result?
+              logger.debug "sent gcm for invite: #{JSON.stringify(result)}"
+              if result.failure > 0
+                removeGcmIds friendname, gcmIds, result.results
+
+              if result.canonical_ids > 0
+                handleCanonicalIds friendname, gcmIds, result.results
+          else
+            logger.debug "gcmIds not set for #{friendname}"
+
+          if apn_tokens?.length > 0
+            logger.debug "sending apns for invite"
+            async.each(
+              apn_tokens,
+              (token, callback) ->
+                apnDevice = new apn.Device token
+                note = new apn.Notification()
+
+                badgeNum = parseInt ids[2]
+                badgeNum = if isNaN(badgeNum) then 0 else badgeNum
+
+                note.badge = badgeNum
+                note.sound = "surespot-invite.caf"
+                note.alert = { "loc-key": "notification_invite", "loc-args": [friendname, username] }
+                apnConnection.pushNotification note, apnDevice
+                callback()
+              (err) ->
+                logger.error "error sending invite apns: #{err}" if err?
+            )
+
+
+          else
+            logger.debug "no apn tokens for #{friendname}"
 
   handleInvite = (req,res,next) ->
     friendname = req.params.username
@@ -3035,54 +3054,62 @@ else
         logger.error "sendPushInviteAccept, #{err}"
         return
 
-      gcmIds = ids[0]?.split(":")
-      apn_tokens = ids[1]?.split(":")
+      #migrate to sets
+      migratePushTokens username, ids[0], ids[1],  (err) ->
+        if err?
+          logger.error "error migrating push tokens for user: #{username}, error: #{err}"
+          return
 
-      if gcmIds?.length > 0
-        logger.debug "sending gcms for invite response notification #{username} #{friendname}"
+        getPushTokens username, (err, gcmIds, apn_tokens) ->
+          if err?
+            logger.error "error getting push tokens for user: #{username}, error: #{err}"
+            return
 
-        gcmmessage = new gcm.Message()
-        sender = new gcm.Sender("#{googleApiKey}", {maxSockets: MAX_GCM_SOCKETS})
-        gcmmessage.addData("type", "inviteResponse")
-        gcmmessage.addData "sentfrom", username
-        gcmmessage.addData "to", friendname
-        gcmmessage.addData("response", "accept")
-        gcmmessage.delayWhileIdle = false
-        gcmmessage.timeToLive = GCM_TTL
-        #gcmmessage.collapseKey = "inviteResponse"
+          if gcmIds?.length > 0
+            logger.debug "sending gcms for invite response notification #{username} #{friendname}"
 
-        sender.send gcmmessage, gcmIds, GCM_RETRIES, (err, result) ->
-          return logger.error "Error sending push invite gcm from: #{username}, to: #{friendname}: #{err}" if err? or not result?
-          logger.debug "sendGcm for invite response notification ok #{username} #{friendname}"
-          if result.failure > 0
-            removeGcmIds friendname, gcmIds, result.results
+            gcmmessage = new gcm.Message()
+            sender = new gcm.Sender("#{googleApiKey}", {maxSockets: MAX_GCM_SOCKETS})
+            gcmmessage.addData("type", "inviteResponse")
+            gcmmessage.addData "sentfrom", username
+            gcmmessage.addData "to", friendname
+            gcmmessage.addData("response", "accept")
+            gcmmessage.delayWhileIdle = false
+            gcmmessage.timeToLive = GCM_TTL
+            #gcmmessage.collapseKey = "inviteResponse"
 
-          if result.canonical_ids > 0
-            handleCanonicalIds friendname, gcmIds, result.results
+            sender.send gcmmessage, gcmIds, GCM_RETRIES, (err, result) ->
+              return logger.error "Error sending push invite gcm from: #{username}, to: #{friendname}: #{err}" if err? or not result?
+              logger.debug "sendGcm for invite response notification ok #{username} #{friendname}"
+              if result.failure > 0
+                removeGcmIds friendname, gcmIds, result.results
 
-      if apn_tokens?.length > 0
-        logger.debug "sending apns for invite response"
+              if result.canonical_ids > 0
+                handleCanonicalIds friendname, gcmIds, result.results
 
-        async.each(
-          apn_tokens,
-          (token, callback) ->
-            apnDevice = new apn.Device token
-            note = new apn.Notification()
+          if apn_tokens?.length > 0
+            logger.debug "sending apns for invite response"
 
-            badgeNum = parseInt ids[2]
-            badgeNum = if isNaN(badgeNum) then 0 else badgeNum
+            async.each(
+              apn_tokens,
+              (token, callback) ->
+                apnDevice = new apn.Device token
+                note = new apn.Notification()
 
-            note.badge = badgeNum
-            note.sound = "invite-accept.caf"
-            note.alert = { "loc-key": "notification_invite_accept", "loc-args": [friendname, username] }
-            apnConnection.pushNotification note, apnDevice
-            callback()
-          (err) ->
-            logger.error "error sending invite response apns: #{err}" if err?
-        )
+                badgeNum = parseInt ids[2]
+                badgeNum = if isNaN(badgeNum) then 0 else badgeNum
 
-      else
-        logger.debug "no apn token for #{friendname}"
+                note.badge = badgeNum
+                note.sound = "invite-accept.caf"
+                note.alert = { "loc-key": "notification_invite_accept", "loc-args": [friendname, username] }
+                apnConnection.pushNotification note, apnDevice
+                callback()
+              (err) ->
+                logger.error "error sending invite response apns: #{err}" if err?
+            )
+
+          else
+            logger.debug "no apn token for #{friendname}"
 
 
   app.post '/invites/:username/:action', ensureAuthenticated, validateUsernameExists, (req, res, next) ->
@@ -3682,31 +3709,15 @@ else
           async.each(
             usernames,
             (username, callback) ->
-              userKey = "u:" + username
-              rcs.hgetall userKey, (err, user) ->
-                return callback(err) if err?
+              logger.debug "removing apn token #{apnToken} from #{username}"
 
-                apnTokens = user?.apnToken?.split(":") ? []
-                #if it's in the list, remove it
-                index = apnTokens.indexOf(apnToken)
+              #remove mapping
+              multi.hdel "apnMap", apnToken
 
-                return callback() if index == -1
+              #set or remove token list
+              multi.sremove "apn:#{username}", apnToken
 
-                apnTokens.splice index, 1
-                newTokens = apnTokens.filter((n) -> return n?.length > 0).join(":")
-
-                logger.debug "removing apn token #{apnToken} from #{username}, new list: #{newTokens}"
-
-                #remove mapping
-                multi.hdel "apnMap", apnToken
-
-                #set or remove token list
-                if newTokens?.length > 0
-                  multi.hset userKey, 'apnToken', newTokens
-                else
-                  multi.hdel userKey, 'apnToken'
-
-                callback()
+              callback()
 
             (err) ->
               return logger.error "error removing apn token: #{err}" if err?
@@ -3715,56 +3726,38 @@ else
           )
 
   removeGcmIds = (username, gcmIds, results) ->
-    indexesToRemove = []
+
+    idsToRemove = []
+
     #check for errors and remove gcm id from user if so
     _.each(
-      results,
-    (item, index) ->
-      error = item.error
-      if error is "NotRegistered" or error is "InvalidRegistration"
-        indexesToRemove.push index)
+      results
+      (item, index) ->
+        error = item.error
+        if error is "NotRegistered" or error is "InvalidRegistration"
+          idsToRemove.push gcmIds[index]
+    )
 
-    saveGcms = []
-    for i in [0..gcmIds.length] by 1
-      if indexesToRemove.indexOf(i) > -1
-        logger.debug "removing gcmId #{gcmIds[i]} from user #{username}"
-      else
-        saveGcms.push gcmIds[i]
 
-    userKey = "u:#{username}"
-    if saveGcms?.length > 0
-      saveGcmString = saveGcms.filter((n) -> n?.length > 0).join(":")
+    if idsToRemove?.length > 0
+      gcmKey = "gcm:#{username}"
+      rc.srem gcmKey, idsToRemove, (err) ->
+        logger.error "error removing gcmIds: #{err}"
 
-      if saveGcmString?.length > 0
-        logger.debug "setting remaining gcmids #{saveGcmString} for user #{username}"
-        rc.hset userKey, 'gcmId', saveGcmString, (err, result) ->
-          logger.error "error setting gcmIds for #{username}" if err?
-      else
-        logger.debug "removing all gcmids for user #{username}"
-        rc.hdel userKey, "gcmId", (err, result) ->
-          logger.error "error removing gcmIds for #{username}" if err?
-    else
-      logger.debug "removing all gcmids for user #{username}"
-      rc.hdel userKey, "gcmId", (err, result) ->
-        logger.error "error removing gcmIds for #{username}" if err?
 
   handleCanonicalIds = (username, gcmIds, results) ->
+    gcmKey = "gcm:#{username}"
     #replace ids with canonical ids
     logger.debug "replacing with canonical ids for user #{username}"
     _.each(
-      results,
+      results
       (item, index) ->
         newId = item.registration_id
         if newId?
           logger.debug "replacing #{gcmIds[index]} with #{newId} for user #{username}"
-          gcmIds[index] = newId)
+          rc.sremove gcmKey, gcmIds[index]
+          rc.sadd gcmKey, newId
+    )
 
-    userKey = "u:#{username}"
-    if gcmIds?.length > 0
-      #make sure they are unique
-      uniqueIds = _.uniq(gcmIds)
-      saveGcmString = uniqueIds.filter((n) -> n?.length > 0).join(":")
-      logger.debug "setting gcmids #{saveGcmString} for user #{username}"
-      rc.hset userKey, 'gcmId', saveGcmString, (err, result) ->
-        logger.error "error setting gcmIds for #{username}" if err?
+
 
