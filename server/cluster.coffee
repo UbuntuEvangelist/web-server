@@ -1104,8 +1104,8 @@ else
 
             logger.debug "gcm data set"
 
-            logger.debug "sending push messages to: #{ids[0]}"
-            sender.send gcmmessage, [gcmIds], GCM_RETRIES, (err, result) ->
+            logger.debug "sending push messages to: #{gcmIds}"
+            sender.send gcmmessage, gcmIds, GCM_RETRIES, (err, result) ->
               return logger.error "Error sending message gcm from: #{message.from}, to: #{message.to}: #{err}" if err? or not result?
               logger.debug "sendGcm result: #{JSON.stringify(result)}"
 
@@ -3321,6 +3321,8 @@ else
 
                             #delete user data
                             multi.del "u:#{username}"
+                            multi.del "gcm:#{username}"
+                            multi.del "apn:#{username}"
 
                             #add user to each friend's set of deleted users
                             async.each(
@@ -3439,6 +3441,8 @@ else
     multi.del "ud:#{username}"
     multi.del "c:#{username}"
     multi.del "od:#{username}"
+    multi.del "gcm:#{username}"
+    multi.del "apn:#{username}"
     multi.hdel "ucmcounters", username
     multi.srem "d", username
 
@@ -3715,7 +3719,7 @@ else
               multi.hdel "apnMap", apnToken
 
               #set or remove token list
-              multi.sremove "apn:#{username}", apnToken
+              multi.srem "apn:#{username}", apnToken
 
               callback()
 
@@ -3742,7 +3746,7 @@ else
     if idsToRemove?.length > 0
       gcmKey = "gcm:#{username}"
       rc.srem gcmKey, idsToRemove, (err) ->
-        logger.error "error removing gcmIds: #{err}"
+        logger.error "error removing gcmIds: #{err}" if err?
 
 
   handleCanonicalIds = (username, gcmIds, results) ->
@@ -3755,8 +3759,11 @@ else
         newId = item.registration_id
         if newId?
           logger.debug "replacing #{gcmIds[index]} with #{newId} for user #{username}"
-          rc.sremove gcmKey, gcmIds[index]
-          rc.sadd gcmKey, newId
+          multi = rc.multi()
+          multi.srem gcmKey, gcmIds[index]
+          multi.sadd gcmKey, newId
+          multi.exec (err) ->
+            logger.error "error replacing canonical gcmIds: #{err}" if err?
     )
 
 
