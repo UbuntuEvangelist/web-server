@@ -2914,12 +2914,12 @@ else
         return
 
       #migrate to sets
-      migratePushTokens username, ids[0], ids[1],  (err) ->
+      migratePushTokens friendname, ids[0], ids[1],  (err) ->
         if err?
           logger.error "error migrating push tokens for user: #{username}, error: #{err}"
           return
 
-        getPushTokens username, (err, gcmIds, apn_tokens) ->
+        getPushTokens friendname, (err, gcmIds, apn_tokens) ->
           if err?
             logger.error "error getting push tokens for user: #{username}, error: #{err}"
             return
@@ -3055,12 +3055,12 @@ else
         return
 
       #migrate to sets
-      migratePushTokens username, ids[0], ids[1],  (err) ->
+      migratePushTokens friendname, ids[0], ids[1],  (err) ->
         if err?
           logger.error "error migrating push tokens for user: #{username}, error: #{err}"
           return
 
-        getPushTokens username, (err, gcmIds, apn_tokens) ->
+        getPushTokens friendname, (err, gcmIds, apn_tokens) ->
           if err?
             logger.error "error getting push tokens for user: #{username}, error: #{err}"
             return
