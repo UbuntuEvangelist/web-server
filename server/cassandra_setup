@@ -17,6 +17,7 @@ CREATE TABLE chatmessages (
   mimetype    varchar,
   datasize    int,
   shareable   boolean,
+  hashed    boolean,
   PRIMARY KEY (username, spotname, id)
 );
 
@@ -71,6 +72,8 @@ CREATE TABLE frienddata (
     aliasIv    varchar,
     aliasData  varchar,
     aliasVersion varchar,
+    imagehashed boolean,
+    aliashashed boolean,
 
     PRIMARY KEY (username, friendname)
 );
