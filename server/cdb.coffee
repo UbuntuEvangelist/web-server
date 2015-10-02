@@ -39,6 +39,7 @@ exports.insertMessage = (message, callback) ->
   logger.debug "cdb.insertMessage"
   spot = common.getSpotName(message.from, message.to)
 
+  #todo change back when we release hashing client to prod
   params1 = [
     message.to,
     spot,
@@ -51,7 +52,7 @@ exports.insertMessage = (message, callback) ->
     message.iv,
     message.data,
     message.mimeType,
-    message.hashed]
+    false]
 
   params2 = [
     message.from,
@@ -65,7 +66,7 @@ exports.insertMessage = (message, callback) ->
     message.iv,
     message.data,
     message.mimeType,
-    message.hashed]
+    false]
 
 
   insert = " INSERT INTO chatmessages (username, spotname, id, datetime, fromuser, fromversion, touser, toversion, iv, data, mimeType, hashed"
