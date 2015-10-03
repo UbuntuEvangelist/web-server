@@ -1588,7 +1588,8 @@ else
     assignFriendImage false, req, res, next
 
   app.post "/images2/:username/:version", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
-    assignFriendImage true, req, res, next
+    #todo prodhash set to true
+    assignFriendImage false, req, res, next
 
   assignFriendImage = (hashed, req, res, next) ->
 
@@ -1664,7 +1665,8 @@ else
     sendImage false, req, res, next
 
   app.post "/images2/:fromversion/:username/:toversion", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
-    sendImage true, req, res, next
+    #todo prodhash set back to true
+    sendImage false, req, res, next
 
   sendImage = (hashed, req, res, next) ->
 
@@ -3514,8 +3516,8 @@ else
           #they've already deleted me
           else
             #remove me from their deleted set (if they deleted their identity) (don't use multi so we can check card post removal later)
-            rc.srem "d:#{theirUsername}", username, (err, rCount) ->
-              return next err if err?
+#            rc.srem "d:#{theirUsername}", username, (err, rCount) ->
+              return next err if err
 
               #if they have been deleted and we are the last person to delete them
               #remove the final pieces of data
