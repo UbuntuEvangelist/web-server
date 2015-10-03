@@ -39,7 +39,7 @@ exports.insertMessage = (message, callback) ->
   logger.debug "cdb.insertMessage"
   spot = common.getSpotName(message.from, message.to)
 
-  #todo change back when we release hashing client to prod
+  #todo prodhash change back when we release hashing client to prod
   params1 = [
     message.to,
     spot,
