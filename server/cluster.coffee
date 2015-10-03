@@ -3516,8 +3516,8 @@ else
           #they've already deleted me
           else
             #remove me from their deleted set (if they deleted their identity) (don't use multi so we can check card post removal later)
-#            rc.srem "d:#{theirUsername}", username, (err, rCount) ->
-              return next err if err
+            rc.srem "d:#{theirUsername}", username, (err, rCount) ->
+              return next err if err?
 
               #if they have been deleted and we are the last person to delete them
               #remove the final pieces of data
