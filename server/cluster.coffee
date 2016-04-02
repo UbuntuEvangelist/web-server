@@ -367,13 +367,19 @@ else
   
   newsub.subscribe "new", (err) ->
     logger.error "error subscribing to new server messages #{err}" if err?
+  newsub.subscribe "newcontrol", (err) ->
+    logger.error "error subscribing to new server control messages #{err}" if err?
   newsub.on 'message', (channel, message) ->
     if channel is 'new'
       mobj = JSON.parse message
       logger.debug "sending message from new server: #{message}"
-
       sio.sockets.to(mobj.to).emit 'message', message
-    
+
+
+    if channel is 'newcontrol'
+      mobj = JSON.parse message
+      logger.debug "sending control message from new server: #{message}"
+      sio.sockets.to(mobj.to).emit 'control', message
 
   initSession = (req,res,next) ->
     mids = []
@@ -1203,6 +1209,12 @@ else
       return callback err if err?
       sio.sockets.to(to).emit "control", message
       sio.sockets.to(from).emit "control", message
+
+      #other server needs to know where it's going
+      om = JSON.parse(message)
+      om.to = to
+
+      newpub.publish 'oldcontrol', JSON.stringify(om)
       callback null, message
 
   createAndSendUserControlMessage = (to, action, data, moredata, callback) ->
@@ -1232,6 +1244,10 @@ else
         cdb.insertUserControlMessage to, message, (err, results) ->
           return callback err if err?
           sio.sockets.to(to).emit "control", newMessage
+
+          #other server needs to know where it's going
+          message.to = to
+          newpub.publish 'oldcontrol', JSON.stringify(message)
           callback()
 
   # broadcast a key revocation message to who's conversations
