@@ -289,8 +289,11 @@ else
   rcs = createRedisClient database, redisSentinelPort, redisSentinelHostname, redisPassword
   pub = createRedisClient database, redisSentinelPort, redisSentinelHostname, redisPassword
   sub = createRedisClient database, redisSentinelPort, redisSentinelHostname, redisPassword
+  newpub = createRedisClient database, redisSentinelPort, redisSentinelHostname, redisPassword
+  newsub = createRedisClient database, redisSentinelPort, redisSentinelHostname, redisPassword
   client = createRedisClient database, redisSentinelPort, redisSentinelHostname, redisPassword
   client2 = createRedisClient database, redisSentinelPort, redisSentinelHostname, redisPassword
+
 
   redback = redbacklib.use rc
   ratelimitermessages = redback.createRateLimit('rlm', { bucket_interval: RATE_LIMIT_BUCKET_MESSAGE })
@@ -357,6 +360,20 @@ else
       accept null, false
 
   typeIsArray = Array.isArray || ( value ) -> return {}.toString.call( value ) is '[object Array]'
+
+
+
+  #subscribe to messages from new server
+  
+  newsub.subscribe "new", (err) ->
+    logger.error "error subscribing to new server messages #{err}" if err?
+  newsub.on 'message', (channel, message) ->
+    if channel is 'new'
+      mobj = JSON.parse message
+      logger.debug "sending message from new server: #{message}"
+
+      sio.sockets.to(mobj.to).emit 'message', message
+    
 
   initSession = (req,res,next) ->
     mids = []
@@ -1021,6 +1038,7 @@ else
 
                 sio.sockets.to(to).emit "message", theirMessage
                 sio.sockets.to(from).emit "message", myMessage
+                newpub.publish 'old', theirMessage
 
                 process.nextTick ->
                   sendPushMessage message, theirMessage
