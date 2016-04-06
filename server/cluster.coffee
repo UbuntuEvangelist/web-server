@@ -1622,8 +1622,7 @@ else
     assignFriendImage false, req, res, next
 
   app.post "/images2/:username/:version", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
-    #todo prodhash set to true
-    assignFriendImage false, req, res, next
+    assignFriendImage true, req, res, next
 
   assignFriendImage = (hashed, req, res, next) ->
 
@@ -1699,8 +1698,7 @@ else
     sendImage false, req, res, next
 
   app.post "/images2/:fromversion/:username/:toversion", ensureAuthenticated, validateUsernameExists, validateAreFriends, (req, res, next) ->
-    #todo prodhash set back to true
-    sendImage false, req, res, next
+    sendImage true, req, res, next
 
   sendImage = (hashed, req, res, next) ->
 
