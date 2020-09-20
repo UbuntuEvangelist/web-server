@@ -11,7 +11,7 @@
     "underscore": "~1.4.3",
     "coffee-script": "~1.6.3",
     "cookie": "0.0.5",
-    "mocha": "~6.0.0",
+    "mocha": "~6.2.3",
     "node-gcm": "https://github.com/surespot/node-gcm/tarball/master",
     "mkdirp": "~0.3.4",
     "should": "~1.2.1",
@@ -56,7 +56,7 @@
     "test": "test"
   },
   "devDependencies": {
-    "mocha": "~6.0.0"
+    "mocha": "~6.2.3"
   },
   "author": "Adam Patacchiola"
 }
