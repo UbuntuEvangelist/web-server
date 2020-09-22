@@ -16,7 +16,7 @@
     "mkdirp": "~0.3.4",
     "should": "~1.2.1",
     "async": "~0.2.5",
-    "express": "~3.2.6",
+    "express": "~4.17.1",
     "throttle": "~1.0.3",
     "socket.io-client": "https://github.com/surespot/socket.io-client/tarball/surespot-test",
     "dateformat": "~1.0.6-1.2.3",
