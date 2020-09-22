@@ -16,7 +16,7 @@
     "mkdirp": "~0.3.4",
     "should": "~1.2.1",
     "async": "~0.2.5",
-    "express": "3.11.0",
+    "express": "4.16.0",
     "throttle": "~1.0.3",
     "socket.io-client": "https://github.com/surespot/socket.io-client/tarball/surespot-test",
     "dateformat": "~1.0.6-1.2.3",
@@ -39,11 +39,14 @@
     "express-bunyan-logger": "1.0.0",
     "jade": "~1.0.0",
     "iap_verifier": "https://github.com/surespot/iap_verifier/tarball/master",
-    "helenus": "https://github.com/surespot/helenus/tarball/master"
+    "helenus": "https://github.com/surespot/helenus/tarball/master",
+    "snyk": "^1.399.1"
   },
   "subdomain": "2fours.com",
   "scripts": {
-    "start": "app.js"
+    "start": "app.js",
+    "snyk-protect": "snyk protect",
+    "prepublish": "npm run snyk-protect"
   },
   "engines": {
     "node": "~0.10.18",
@@ -58,5 +61,6 @@
   "devDependencies": {
     "mocha": "~6.2.3"
   },
-  "author": "Adam Patacchiola"
+  "author": "Adam Patacchiola",
+  "snyk": true
 }
