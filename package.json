@@ -35,8 +35,8 @@
     "dcrypt": "https://github.com/surespot/dcrypt/tarball/master",
     "apn": "~1.4.2",
     "ua-parser": "~0.3.3",
-    "bunyan": "~0.22.1",
-    "express-bunyan-logger": "0.0.2",
+    "bunyan": "~1.8.13",
+    "express-bunyan-logger": "1.0.0",
     "jade": "~1.0.0",
     "iap_verifier": "https://github.com/surespot/iap_verifier/tarball/master",
     "helenus": "https://github.com/surespot/helenus/tarball/master"
