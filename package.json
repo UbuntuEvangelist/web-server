@@ -61,4 +61,7 @@
     "mocha": "~6.2.3"
   },
   "author": "Adam Patacchiola"
+  },
+"dependencies": {
+  "connect": ">=2.8.1"
 }
