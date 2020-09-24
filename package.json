@@ -6,7 +6,7 @@
   "dependencies": {
     "apn": "1.4.4",
     "async": "0.2.10",
-    "bcrypt": "3.0.6",
+    "bcrypt": "5.0.0",
     "bunyan": "0.22.3",
     "chai": "1.1.1",
     "coffee-script": "1.6.3",
