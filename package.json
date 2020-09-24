@@ -13,6 +13,7 @@
     "connect": "2.8.1",
     "connect-redis": "1.4.5",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "cookie": "0.0.5",
     "dateformat": "1.0.12",
     "dcrypt": "https://github.com/surespot/dcrypt/tarball/master",
@@ -44,6 +45,8 @@
     "ua-parser": "0.7.22",
     "underscore": "1.4.4"
 =======
+=======
+>>>>>>> 4a74201cb6ead58864e86b72c47df17f9defc089
     "bcrypt": "~5.0.0",
     "socket.io": "https://github.com/surespot/socket.io/tarball/surespot",
     "chai": "~1.1.1",
@@ -80,6 +83,9 @@
     "iap_verifier": "https://github.com/surespot/iap_verifier/tarball/master",
     "helenus": "https://github.com/surespot/helenus/tarball/master",
     "snyk": "^1.399.1"
+<<<<<<< HEAD
+>>>>>>> 4a74201cb6ead58864e86b72c47df17f9defc089
+=======
 >>>>>>> 4a74201cb6ead58864e86b72c47df17f9defc089
   },
   "subdomain": "2fours.com",
