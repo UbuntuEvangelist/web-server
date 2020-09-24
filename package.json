@@ -19,7 +19,7 @@
     "express": "4.5.0",
     "express-bunyan-logger": "0.0.2",
     "formidable": "1.0.16",
-    "googleapis": "39.0.0",
+    "googleapis": "60.0.1",
     "helenus": "http://github.com/surespot/helenus/tarball/master",
     "iap_verifier": "http://github.com/surespot/iap_verifier/tarball/master",
     "jade": "1.0.2",
