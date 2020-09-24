@@ -14,6 +14,7 @@
     "connect-redis": "1.4.5",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     "cookie": "0.0.5",
     "dateformat": "1.0.12",
     "dcrypt": "https://github.com/surespot/dcrypt/tarball/master",
@@ -45,6 +46,8 @@
     "ua-parser": "0.7.22",
     "underscore": "1.4.4"
 =======
+=======
+>>>>>>> 4a74201cb6ead58864e86b72c47df17f9defc089
 =======
 >>>>>>> 4a74201cb6ead58864e86b72c47df17f9defc089
     "bcrypt": "~5.0.0",
@@ -84,6 +87,9 @@
     "helenus": "https://github.com/surespot/helenus/tarball/master",
     "snyk": "^1.399.1"
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> 4a74201cb6ead58864e86b72c47df17f9defc089
+=======
 >>>>>>> 4a74201cb6ead58864e86b72c47df17f9defc089
 =======
 >>>>>>> 4a74201cb6ead58864e86b72c47df17f9defc089
