@@ -4,10 +4,9 @@
 	"description": "App Server For Instant Messaging App",
 	"node": "12.18.4",
 	"private": false,
-               "dependencies": {
+	"dependencies": {
 		"bcryptjs": "^2.4.3",
 		"check-is-deprecated": "^2.0.0",
-		"dcrypt": "https://github.com/surespot/dcrypt/tarball/master",
 		"debug": "^4.2.0",
 		"is-array": "^1.0.1",
 		"lodash": "^4.17.20"
@@ -22,9 +21,9 @@
 		"type": "git",
 		"url": "git+https://github.com/SchoolOfFreelancing/SureSpot.git"
 	},
-       "publishConfig": {
-              "registry": "https://registry.npmjs.org/@linuxgun"
-        },
+	"publishConfig": {
+		"registry": "https://registry.npmjs.org/@linuxgun"
+	},
 	"engines": {
 		"node": "12.18.4",
 		"npm": "6.14.8"
@@ -44,6 +43,7 @@
 		"connect-redis": "^5.0.0",
 		"cookie": "^0.4.1",
 		"dateformat": "^3.0.3",
+		"dcrypt": "0.0.2",
 		"err": "^2.1.12",
 		"errorhandler": "^1.5.1",
 		"express": "^4.17.1",
